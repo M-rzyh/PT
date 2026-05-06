@@ -59,7 +59,9 @@ class Model:
                tx: Optional[optax.GradientTransformation] = None) -> 'Model':
         variables = model_def.init(*inputs)
 
-        _, params = variables.pop('params')
+        # flax 0.8+ returns a plain dict from `init`; the old `_, params =
+        # variables.pop('params')` only worked for the legacy FrozenDict.
+        params = variables['params']
 
         if tx is not None:
             opt_state = tx.init(params)

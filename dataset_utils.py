@@ -2,8 +2,12 @@ import collections
 from typing import Optional
 
 import jax
-import d4rl
+try:
+    import d4rl  # only needed when loading D4RL MuJoCo / AntMaze tasks
+except ImportError:
+    d4rl = None
 import gym
+import h5py
 import numpy as np
 import jax.numpy as jnp
 from tqdm import tqdm, trange
@@ -75,6 +79,12 @@ class D4RLDataset(Dataset):
                  env: gym.Env,
                  clip_to_eps: bool = True,
                  eps: float = 1e-5):
+        if d4rl is None:
+            raise ImportError(
+                "d4rl is not installed. Use LunarLanderHDF5Dataset for "
+                "LunarLander, or `pip install -e d4rl/` (with MuJoCo) for "
+                "the MuJoCo / AntMaze tasks."
+            )
         dataset = d4rl.qlearning_dataset(env)
 
         if clip_to_eps:
@@ -101,6 +111,53 @@ class D4RLDataset(Dataset):
                          next_observations=dataset['next_observations'].astype(
                              np.float32),
                          size=len(dataset['observations']))
+
+
+class LunarLanderHDF5Dataset(Dataset):
+    """Loads our LunarLander offline HDF5 (produced by `scripts/offline_data/`).
+
+    The HDF5 schema matches D4RL's qlearning_dataset (observations, actions,
+    rewards, next_observations, terminals, timeouts), so the math here mirrors
+    `D4RLDataset.__init__`. The only difference is we read from an arbitrary
+    HDF5 path instead of `d4rl.qlearning_dataset(env)`.
+    """
+
+    def __init__(self,
+                 dataset_path: str,
+                 clip_to_eps: bool = True,
+                 eps: float = 1e-5):
+        with h5py.File(dataset_path, "r") as f:
+            obs = f["observations"][:].astype(np.float32)
+            actions = f["actions"][:].astype(np.float32)
+            rewards = f["rewards"][:].astype(np.float32)
+            next_obs = f["next_observations"][:].astype(np.float32)
+            terminals = f["terminals"][:].astype(np.float32)
+            # timeouts are present in the HDF5 but not used here — matches
+            # D4RLDataset, which derives `dones_float` purely from terminals
+            # and observation discontinuities.
+
+        if clip_to_eps:
+            lim = 1 - eps
+            actions = np.clip(actions, -lim, lim)
+
+        dones_float = np.zeros_like(rewards)
+        for i in range(len(dones_float) - 1):
+            if (np.linalg.norm(obs[i + 1] - next_obs[i]) > 1e-5
+                    or terminals[i] == 1.0):
+                dones_float[i] = 1
+            else:
+                dones_float[i] = 0
+        dones_float[-1] = 1
+
+        super().__init__(
+            observations=obs,
+            actions=actions,
+            rewards=rewards,
+            masks=1.0 - terminals,
+            dones_float=dones_float.astype(np.float32),
+            next_observations=next_obs,
+            size=len(obs),
+        )
 
 
 class RelabeledDataset(Dataset):

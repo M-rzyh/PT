@@ -11,7 +11,10 @@ from ml_collections import config_flags
 from tensorboardX import SummaryWriter
 
 import wrappers
-from dataset_utils import D4RLDataset, reward_from_preference, reward_from_preference_transformer, split_into_trajectories
+from dataset_utils import (D4RLDataset, LunarLanderHDF5Dataset,
+                            reward_from_preference,
+                            reward_from_preference_transformer,
+                            split_into_trajectories)
 from evaluation import evaluate
 from learner import Learner
 
@@ -40,6 +43,8 @@ flags.DEFINE_string('comment',
 flags.DEFINE_integer('seq_len', 25, 'sequence length for relabeling reward in Transformer.')
 flags.DEFINE_bool('use_diff', False, 'boolean whether use difference in sequence for reward relabeling.')
 flags.DEFINE_string('label_mode', 'last', 'mode for relabeling reward with tranformer.')
+flags.DEFINE_string('dataset_path', '',
+                    'Path to a custom HDF5 dataset (used when env_name starts with "lunarlander").')
 
 config_flags.DEFINE_config_file(
     'config',
@@ -86,7 +91,17 @@ def normalize(dataset, env_name, max_episode_steps=1000):
 
 def make_env_and_dataset(env_name: str,
                          seed: int) -> Tuple[gym.Env, D4RLDataset]:
-    env = gym.make(env_name)
+    if env_name.startswith('lunarlander'):
+        # gym 0.23.1 still calls it LunarLanderContinuous-v2 (sb3's gymnasium
+        # uses -v3, but the env semantics are identical). The dataset comes
+        # from FLAGS.dataset_path, not the gym registry.
+        if not FLAGS.dataset_path:
+            raise ValueError(
+                f"--dataset_path is required when --env_name='{env_name}'."
+            )
+        env = gym.make('LunarLanderContinuous-v2')
+    else:
+        env = gym.make(env_name)
 
     env = wrappers.EpisodeMonitor(env)
     env = wrappers.SinglePrecision(env)
@@ -95,7 +110,10 @@ def make_env_and_dataset(env_name: str,
     env.action_space.seed(seed)
     env.observation_space.seed(seed)
 
-    dataset = D4RLDataset(env)
+    if env_name.startswith('lunarlander'):
+        dataset = LunarLanderHDF5Dataset(FLAGS.dataset_path)
+    else:
+        dataset = D4RLDataset(env)
 
     if FLAGS.use_reward_model:
         reward_model = initialize_model()
@@ -113,18 +131,23 @@ def make_env_and_dataset(env_name: str,
             )
         del reward_model
 
+    is_locomotion = ('halfcheetah' in FLAGS.env_name
+                     or 'walker2d' in FLAGS.env_name
+                     or 'hopper' in FLAGS.env_name
+                     or 'lunarlander' in FLAGS.env_name)
+
     if FLAGS.use_reward_model:
         normalize(dataset, FLAGS.env_name, max_episode_steps=env.env.env._max_episode_steps)
         if 'antmaze' in FLAGS.env_name:
             dataset.rewards -= 1.0
-        if ('halfcheetah' in FLAGS.env_name or 'walker2d' in FLAGS.env_name or 'hopper' in FLAGS.env_name):
+        if is_locomotion:
             dataset.rewards += 0.5
     else:
         if 'antmaze' in FLAGS.env_name:
             dataset.rewards -= 1.0
             # See https://github.com/aviralkumar2907/CQL/blob/master/d4rl/examples/cql_antmaze_new.py#L22
             # but I found no difference between (x - 0.5) * 4 and x - 1.0
-        elif ('halfcheetah' in FLAGS.env_name or 'walker2d' in FLAGS.env_name or 'hopper' in FLAGS.env_name):
+        elif is_locomotion:
             normalize(dataset, FLAGS.env_name, max_episode_steps=env.env.env._max_episode_steps)
 
     return env, dataset
