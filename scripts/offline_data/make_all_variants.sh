@@ -62,12 +62,16 @@ echo "ROLLOUT_STEPS= $ROLLOUT_STEPS"
 echo "SEED         = $SEED"
 echo ""
 
-echo "[1/5] training SAC ($TOTAL_STEPS steps, snapshot at $MEDIUM_STEP)..."
-python -m scripts.offline_data.train_sac_for_offline \
-    --save_dir "$SAC_DIR" \
-    --total_steps "$TOTAL_STEPS" \
-    --medium_step "$MEDIUM_STEP" \
-    --seed "$SEED"
+if [ -f "$SAC_DIR/medium/actor.zip" ] && [ -f "$SAC_DIR/expert/actor.zip" ]; then
+    echo "[1/5] skipping SAC training — $SAC_DIR/{medium,expert}/actor.zip already exist."
+else
+    echo "[1/5] training SAC ($TOTAL_STEPS steps, snapshot at $MEDIUM_STEP)..."
+    python -m scripts.offline_data.train_sac_for_offline \
+        --save_dir "$SAC_DIR" \
+        --total_steps "$TOTAL_STEPS" \
+        --medium_step "$MEDIUM_STEP" \
+        --seed "$SEED"
+fi
 
 echo ""
 echo "[2/5] random rollout ($ROLLOUT_STEPS steps)..."
@@ -78,12 +82,11 @@ python -m scripts.offline_data.rollout_to_hdf5 \
     --seed "$SEED"
 
 echo ""
-echo "[3/5] medium rollout ($ROLLOUT_STEPS steps, deterministic)..."
+echo "[3/5] medium rollout ($ROLLOUT_STEPS steps, stochastic)..."
 python -m scripts.offline_data.rollout_to_hdf5 \
     --actor "$SAC_DIR/medium/actor.zip" \
     --output "$DATA_DIR/lunarlander-medium-v2.hdf5" \
     --num_steps "$ROLLOUT_STEPS" \
-    --deterministic \
     --seed "$SEED"
 
 echo ""
@@ -94,12 +97,11 @@ python -m scripts.offline_data.replay_to_hdf5 \
     --output "$DATA_DIR/lunarlander-medium-replay-v2.hdf5"
 
 echo ""
-echo "[5/5] expert rollout ($ROLLOUT_STEPS steps, deterministic)..."
+echo "[5/5] expert rollout ($ROLLOUT_STEPS steps, stochastic)..."
 python -m scripts.offline_data.rollout_to_hdf5 \
     --actor "$SAC_DIR/expert/actor.zip" \
     --output "$DATA_DIR/lunarlander-expert-v2.hdf5" \
     --num_steps "$ROLLOUT_STEPS" \
-    --deterministic \
     --seed "$SEED"
 
 echo ""
