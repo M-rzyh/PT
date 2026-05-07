@@ -4,7 +4,7 @@
 #SBATCH --array=0-4
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
 #
@@ -13,14 +13,22 @@
 #
 #   $SCRATCH/PT/lunarlander/seed_${SEED}/
 #       lunarlander-random-v2.hdf5         random uniform actions, 1M steps
-#       lunarlander-medium-v2.hdf5         1M deterministic rollouts of SAC@250K
-#       lunarlander-medium-replay-v2.hdf5  the SAC replay buffer at step 250K
+#       lunarlander-medium-v2.hdf5         1M deterministic rollouts of SAC@70K
+#       lunarlander-medium-replay-v2.hdf5  the SAC replay buffer at step 70K
 #       lunarlander-medium-expert-v2.hdf5  500K medium + 500K expert
-#       lunarlander-expert-v2.hdf5         1M deterministic rollouts of SAC@1M
+#       lunarlander-expert-v2.hdf5         1M deterministic rollouts of SAC@500K
 #
-# CPU-only: SAC on LunarLander's 8-d state runs ~5K env-steps/sec on a single
-# core (smoke test confirmed); GPU would barely help. Wall time per seed is
-# ~30 min. The 5 array tasks run in parallel when cluster has capacity.
+# CPU-only. With gradient updates kicked in (after learning_starts=10K), SAC
+# runs ~46 env-steps/sec on a single core. 500K training ≈ 3 h, plus ~10 min
+# of rollouts and exports — well under the 4 h SBATCH budget. The 5 array
+# tasks run in parallel when cluster has capacity.
+#
+# MEDIUM_STEP=70000: seed-0's reward curve from the previous (timed-out) run
+# crosses +120 at step 70K — squarely in D4RL's "medium" band of [+80, +130].
+# (The earlier 250K choice landed at ~+269, essentially expert.)
+# TOTAL_STEPS=500000: seed-0 was at +269 by step 250K; 500K gives expert with
+# headroom. D4RL paper used 1M end-to-end, but the practical "expert" recipe
+# is "the snapshot at the end of training", which is what we keep.
 
 set -euo pipefail
 
@@ -39,8 +47,8 @@ cd /home/marzii/PT/PreferenceTransformer
 SEED=${SEED:-${SLURM_ARRAY_TASK_ID:-0}}
 DATA_DIR=${DATA_DIR:-$SCRATCH/PT/lunarlander/seed_${SEED}}
 SAC_DIR=${SAC_DIR:-$DATA_DIR/sac_run}
-TOTAL_STEPS=${TOTAL_STEPS:-1000000}
-MEDIUM_STEP=${MEDIUM_STEP:-250000}
+TOTAL_STEPS=${TOTAL_STEPS:-500000}
+MEDIUM_STEP=${MEDIUM_STEP:-70000}
 ROLLOUT_STEPS=${ROLLOUT_STEPS:-1000000}
 
 mkdir -p "$DATA_DIR"
