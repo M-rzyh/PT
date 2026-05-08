@@ -15,9 +15,16 @@ from flax.training.early_stopping import EarlyStopping
 from flaxmodels.flaxmodels.lstm.lstm import LSTMRewardModel
 from flaxmodels.flaxmodels.gpt2.trajectory_gpt2 import TransRewardModel
 
-import robosuite as suite
-from robosuite.wrappers import GymWrapper
-import robomimic.utils.env_utils as EnvUtils
+try:
+    import robosuite as suite
+    from robosuite.wrappers import GymWrapper
+    import robomimic.utils.env_utils as EnvUtils
+    _ROBOSUITE_OK = True
+except ImportError:
+    _ROBOSUITE_OK = False
+    suite = None
+    GymWrapper = None
+    EnvUtils = None
 
 from .sampler import TrajSampler
 from .jax_utils import batch_to_jax
@@ -25,7 +32,8 @@ import JaxPref.reward_transform as r_tf
 from .model import FullyConnectedQFunction
 from viskit.logging import logger, setup_logger
 from .MR import MR
-from .replay_buffer import get_d4rl_dataset, index_batch
+from .replay_buffer import (get_d4rl_dataset, get_lunarlander_hdf5_dataset,
+                            index_batch)
 from .NMR import NMR
 from .PrefTransformer import PrefTransformer
 from .utils import Timer, define_flags_with_default, set_random_seed, get_user_flags, prefix_metrics, WandBLogger, save_pickle
@@ -78,6 +86,9 @@ FLAGS_DEF = define_flags_with_default(
     robosuite_dataset_path='./data',
     robosuite_max_episode_steps=500,
 
+    # LunarLander HDF5 path (used when env starts with "lunarlander").
+    dataset_path='',
+
     reward=MR.get_default_config(),
     transformer=PrefTransformer.get_default_config(),
     lstm=NMR.get_default_config(),
@@ -113,6 +124,10 @@ def main(_):
     set_random_seed(FLAGS.seed)
 
     if FLAGS.robosuite:
+        if not _ROBOSUITE_OK:
+            raise ImportError(
+                "--robosuite was set but robosuite/robomimic are not installed."
+            )
         dataset = r_tf.qlearning_robosuite_dataset(os.path.join(FLAGS.robosuite_dataset_path, FLAGS.env.lower(), FLAGS.robosuite_dataset_type, "low_dim.hdf5"))
         env = EnvUtils.create_env_from_metadata(
             env_meta=dataset['env_meta'],
@@ -126,6 +141,17 @@ def main(_):
         gym_env.observation_space.seed(FLAGS.seed)
         gym_env.ignore_done = False
         label_type = 1
+    elif FLAGS.env.startswith('lunarlander'):
+        if not FLAGS.dataset_path:
+            raise ValueError("--dataset_path is required for lunarlander envs.")
+        gym_env = gym.make('LunarLanderContinuous-v2')
+        gym_env = wrappers.EpisodeMonitor(gym_env)
+        gym_env = wrappers.SinglePrecision(gym_env)
+        gym_env.seed(FLAGS.seed)
+        gym_env.action_space.seed(FLAGS.seed)
+        gym_env.observation_space.seed(FLAGS.seed)
+        dataset = get_lunarlander_hdf5_dataset(FLAGS.dataset_path)
+        label_type = 1  # binary; ties allowed via 0.5 in load_queries_with_indices
     elif 'ant' in FLAGS.env:
         gym_env = gym.make(FLAGS.env)
         gym_env = wrappers.EpisodeMonitor(gym_env)
@@ -273,7 +299,10 @@ def main(_):
                     # choose eval loss as criteria.
                     criteria_key = key
             criteria = np.mean(metrics[criteria_key])
-            has_improved, early_stop = early_stop.update(criteria)
+            # flax 0.8+ EarlyStopping.update() returns just the updated state;
+            # `has_improved` is now an attribute on it (was a tuple in flax<0.8).
+            early_stop = early_stop.update(criteria)
+            has_improved = early_stop.has_improved
             if early_stop.should_stop and FLAGS.early_stop:
                 for key, val in metrics.items():
                     if isinstance(val, list):

@@ -2,8 +2,12 @@ from copy import copy, deepcopy
 from queue import Queue
 import threading
 
-import d4rl
+try:
+    import d4rl  # only needed for D4RL MuJoCo / AntMaze
+except ImportError:
+    d4rl = None
 
+import h5py
 import numpy as np
 import jax.numpy as jnp
 
@@ -96,6 +100,12 @@ class ReplayBuffer(object):
 
 
 def get_d4rl_dataset(env):
+    if d4rl is None:
+        raise ImportError(
+            "d4rl is not installed. Use get_lunarlander_hdf5_dataset() for "
+            "LunarLander, or `pip install -e d4rl/` (with MuJoCo) for the "
+            "MuJoCo / AntMaze tasks."
+        )
     dataset = d4rl.qlearning_dataset(env)
     return dict(
         observations=dataset['observations'],
@@ -104,6 +114,28 @@ def get_d4rl_dataset(env):
         rewards=dataset['rewards'],
         dones=dataset['terminals'].astype(np.float32),
     )
+
+
+def get_lunarlander_hdf5_dataset(path):
+    """Read our LunarLander HDF5 (D4RL schema) and return the dict shape
+    consumed by JaxPref/reward_transform.py.
+
+    `new_get_trj_idx` uses dataset['terminals'] (and dataset['timeouts'] if
+    present) to split trajectories, so we expose both. `dones` is kept for
+    callers that follow the get_d4rl_dataset convention.
+    """
+    with h5py.File(path, 'r') as f:
+        terminals = f['terminals'][:].astype(np.float32)
+        timeouts = f['timeouts'][:].astype(np.float32)
+        return dict(
+            observations=f['observations'][:].astype(np.float32),
+            actions=f['actions'][:].astype(np.float32),
+            next_observations=f['next_observations'][:].astype(np.float32),
+            rewards=f['rewards'][:].astype(np.float32),
+            terminals=terminals,
+            timeouts=timeouts,
+            dones=terminals,  # back-compat with get_d4rl_dataset callers
+        )
 
 
 def index_batch(batch, indices):

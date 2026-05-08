@@ -53,7 +53,12 @@ def main() -> None:
     if not keep:
         raise SystemExit("no labelled (non-Skip) pairs in this file.")
 
-    sel_labels = [int(labels[i]) for i in keep]
+    # Convention remap to PT's `JaxPref/reward_transform.py:load_queries_with_indices`:
+    #   web -1 (A preferred) -> PT  0
+    #   web  0 (tie)         -> PT -1
+    #   web  1 (B preferred) -> PT  1
+    web_to_pt = {-1: 0, 0: -1, 1: 1}
+    sel_labels = [web_to_pt[int(labels[i])] for i in keep]
     sel_a = np.asarray([a[i] for i in keep], dtype=np.int32)
     sel_b = np.asarray([b[i] for i in keep], dtype=np.int32)
 

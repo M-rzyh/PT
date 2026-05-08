@@ -154,3 +154,5 @@ final/
 iql_final/
 transformer_exp/
 result/
+# Phase D output (per-run; checkpoints + wandb logs go to scratch in real runs)
+reward_model/
