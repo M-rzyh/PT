@@ -212,11 +212,14 @@ def main(_):
         with open(os.path.join(base_path, script_labels_file), "rb") as fp:   # Unpickling
             human_labels = pickle.load(fp)
         true_eval = True if len(human_labels) > FLAGS.num_query else False
+        # Upstream code tried to pass `topk`, `window`, `feedback_random`,
+        # `pref_attn_n_head`, `true_eval` here — these are ablation hooks
+        # that never landed in `load_queries_with_indices`'s signature.
+        # Drop them; the kwargs the function actually accepts are below.
         pref_eval_dataset = r_tf.load_queries_with_indices(
             gym_env, dataset, int(FLAGS.num_query * 0.1), FLAGS.query_len,
             label_type=label_type, saved_indices=[human_indices, human_indices_2], saved_labels=human_labels,
-            balance=FLAGS.balance, topk=FLAGS.topk, scripted_teacher=True, window=FLAGS.window, 
-            feedback_random=FLAGS.feedback_random, pref_attn_n_head=FLAGS.transformer.pref_attn_n_head, true_eval=true_eval)
+            balance=FLAGS.balance, scripted_teacher=True)
 
     set_random_seed(FLAGS.seed)
     observation_dim = gym_env.observation_space.shape[0]
