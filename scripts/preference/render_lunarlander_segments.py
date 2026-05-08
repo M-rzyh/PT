@@ -66,50 +66,110 @@ def load_indices(query_dir: Path, num_query: int, query_len: int) -> tuple[np.nd
     return np.asarray(i1, dtype=np.int64), np.asarray(i2, dtype=np.int64)
 
 
-def render_segment(obs: np.ndarray, rew: np.ndarray, out_path: Path, fps: int) -> None:
-    """obs: (T, 8), rew: (T,) — write an mp4 to out_path."""
+def _triangle_vertices(x: float, y: float, ang: float, size: float = 0.15) -> np.ndarray:
+    """Return (3, 2) lander-body vertices for centre (x, y) at orientation `ang`
+    (radians; 0 = nose up). Built locally then translated, so it works
+    regardless of matplotlib's patch internals."""
+    # local frame: nose pointing +y
+    local = np.array([
+        [0.0,        +size],          # nose
+        [-0.7 * size, -0.6 * size],   # bottom-left
+        [+0.7 * size, -0.6 * size],   # bottom-right
+    ])
+    c, s = np.cos(ang), np.sin(ang)
+    R = np.array([[c, -s], [s, c]])
+    return (local @ R.T) + np.array([x, y])
+
+
+def render_segment(obs: np.ndarray, act: np.ndarray, rew: np.ndarray,
+                   out_path: Path, fps: int) -> None:
+    """obs: (T, 8), act: (T, 2), rew: (T,) — write an mp4 to out_path."""
     T = len(obs)
     xs, ys = obs[:, 0], obs[:, 1]
+    vxs, vys = obs[:, 2], obs[:, 3]
     angles = obs[:, 4]
     leg_l, leg_r = obs[:, 6] > 0.5, obs[:, 7] > 0.5
     cum_r = np.cumsum(rew)
 
+    # Fixed bounds chosen to cover the data's 1st…99th-percentile range
+    # observed in lunarlander-medium-replay-v2 (x ∈ [-1, 1], y ∈ [-0.4, 2.0])
+    # plus margin.
+    XL, XH = -1.5, 1.5
+    YL, YH = -0.4, 2.2
+
     fig, ax = plt.subplots(figsize=(5, 5), dpi=100)
-    ax.set_xlim(-1.6, 1.6); ax.set_ylim(-0.2, 1.6)
+    ax.set_xlim(XL, XH); ax.set_ylim(YL, YH)
     ax.set_aspect("equal"); ax.set_facecolor("#0f172a")
-    ax.tick_params(colors="#94a3b8")
-    for spine in ax.spines.values(): spine.set_color("#334155")
+    ax.set_xticks([-1, 0, 1]); ax.set_yticks([0, 1, 2])
+    ax.tick_params(colors="#94a3b8", labelsize=8)
+    for spine in ax.spines.values():
+        spine.set_color("#334155")
 
-    # ground
-    ax.plot([-1.6, -0.2, -0.2, 0.2, 0.2, 1.6], [0.05, 0.05, 0, 0, 0.05, 0.05],
+    # Ground + landing pad
+    ax.plot([XL, -0.2, -0.2, 0.2, 0.2, XH], [0.06, 0.06, 0, 0, 0.06, 0.06],
             color="#22c55e", lw=2)
-    ax.add_patch(mpatches.Rectangle((-0.2, 0.0), 0.4, 0.04, color="#facc15"))
+    ax.add_patch(mpatches.Rectangle((-0.2, 0.0), 0.4, 0.04,
+                                     color="#facc15", zorder=1))
+    # Goal flags
+    ax.plot([-0.2, -0.2], [0, 0.18], color="#facc15", lw=1.5)
+    ax.plot([+0.2, +0.2], [0, 0.18], color="#facc15", lw=1.5)
 
-    trail, = ax.plot([], [], color="#64748b", lw=1, alpha=0.6)
-    body = mpatches.RegularPolygon((0, 0), 3, radius=0.08, color="#60a5fa")
+    trail, = ax.plot([], [], color="#94a3b8", lw=1.2, alpha=0.7, zorder=2)
+    body = mpatches.Polygon(_triangle_vertices(0, 0, 0),
+                             closed=True, color="#60a5fa", zorder=4)
     ax.add_patch(body)
-    leg_l_art, = ax.plot([], [], lw=3, color="#94a3b8")
-    leg_r_art, = ax.plot([], [], lw=3, color="#94a3b8")
-    title = ax.text(0.02, 0.97, "", transform=ax.transAxes,
-                    color="#e2e8f0", va="top", ha="left", fontsize=10,
-                    family="monospace")
+    leg_l_art, = ax.plot([], [], lw=3, color="#94a3b8", zorder=3,
+                          solid_capstyle="round")
+    leg_r_art, = ax.plot([], [], lw=3, color="#94a3b8", zorder=3,
+                          solid_capstyle="round")
+    # Velocity arrow (semi-transparent, scaled for visibility)
+    vel_arrow = mpatches.FancyArrowPatch((0, 0), (0, 0),
+                                          arrowstyle="-|>",
+                                          mutation_scale=10,
+                                          color="#fbbf24",
+                                          alpha=0.8, zorder=5)
+    ax.add_patch(vel_arrow)
+
+    hud = ax.text(0.02, 0.98, "", transform=ax.transAxes,
+                  color="#e2e8f0", va="top", ha="left", fontsize=9,
+                  family="monospace",
+                  bbox=dict(facecolor="#0f172a", edgecolor="#334155",
+                            alpha=0.85, pad=4))
+
+    leg_offset = 0.13  # leg length
 
     def update(t: int):
-        x, y, ang = xs[t], ys[t], angles[t]
-        body.xy = (x, y)
-        body.orientation = ang + np.pi / 2  # nose up at angle=0
-        # Legs splayed ±25°, length 0.12
-        for sign, art, contact in ((-1, leg_l_art, leg_l[t]), (+1, leg_r_art, leg_r[t])):
-            base_a = ang - np.pi / 2 + sign * np.deg2rad(25)
-            x2, y2 = x + 0.12 * np.cos(base_a), y + 0.12 * np.sin(base_a)
+        x, y = float(xs[t]), float(ys[t])
+        ang = float(angles[t])
+        # Body triangle
+        body.set_xy(_triangle_vertices(x, y, ang))
+        # Legs: angled at ±35° from "down" in body frame
+        for sign, art, contact in ((-1, leg_l_art, leg_l[t]),
+                                    (+1, leg_r_art, leg_r[t])):
+            leg_dir = ang + sign * np.deg2rad(35) - np.pi / 2  # 0 angle => down
+            x2 = x + leg_offset * np.cos(leg_dir)
+            y2 = y + leg_offset * np.sin(leg_dir)
             art.set_data([x, x2], [y, y2])
             art.set_color("#ef4444" if contact else "#94a3b8")
+            art.set_linewidth(4 if contact else 2.5)
+        # Trail
         trail.set_data(xs[:t + 1], ys[:t + 1])
-        title.set_text(
-            f"t={t:>3d}/{T-1}  pos=({x:+.2f},{y:+.2f})  ang={np.rad2deg(ang):+5.1f}°\n"
-            f"r_t={rew[t]:+6.2f}  Σr={cum_r[t]:+7.1f}"
+        # Velocity arrow (scale for visibility, cap length)
+        vmag = float(np.hypot(vxs[t], vys[t]))
+        if vmag > 1e-3:
+            vx_s = float(vxs[t]) * 0.15
+            vy_s = float(vys[t]) * 0.15
+            vel_arrow.set_positions((x, y), (x + vx_s, y + vy_s))
+            vel_arrow.set_alpha(min(0.9, 0.3 + vmag / 3.0))
+        else:
+            vel_arrow.set_positions((x, y), (x, y))
+        hud.set_text(
+            f"t={t:>3d}/{T-1}  x={x:+.2f}  y={y:+.2f}\n"
+            f"v=({vxs[t]:+.2f},{vys[t]:+.2f})  ang={np.rad2deg(ang):+5.1f}°\n"
+            f"a=({act[t,0]:+.2f},{act[t,1]:+.2f})\n"
+            f"r_t={rew[t]:+6.2f}   Σr={cum_r[t]:+7.1f}"
         )
-        return body, leg_l_art, leg_r_art, trail, title
+        return body, leg_l_art, leg_r_art, trail, vel_arrow, hud
 
     a = anim.FuncAnimation(fig, update, frames=T, interval=1000 / fps, blit=False)
     writer = anim.FFMpegWriter(fps=fps, codec="libx264", bitrate=800,
@@ -131,6 +191,7 @@ def main() -> None:
 
     with h5py.File(args.hdf5, "r") as f:
         obs_all = f["observations"][:]
+        act_all = f["actions"][:]
         rew_all = f["rewards"][:]
 
     batch_dir = args.output_dir / f"batch_{args.batch_idx:03d}"
@@ -140,14 +201,13 @@ def main() -> None:
         pair_dir = batch_dir / f"pair_{q:03d}"
         pair_dir.mkdir(parents=True, exist_ok=True)
         s1, s2 = int(i1[q]), int(i2[q])
-        seg1_obs = obs_all[s1:s1 + args.query_len]
-        seg1_rew = rew_all[s1:s1 + args.query_len]
-        seg2_obs = obs_all[s2:s2 + args.query_len]
-        seg2_rew = rew_all[s2:s2 + args.query_len]
-        print(f"[render] pair {q:03d}: A start={s1} ΣrA={float(seg1_rew.sum()):+.1f}  "
-              f"B start={s2} ΣrB={float(seg2_rew.sum()):+.1f}")
-        render_segment(seg1_obs, seg1_rew, pair_dir / "seg_A.mp4", args.fps)
-        render_segment(seg2_obs, seg2_rew, pair_dir / "seg_B.mp4", args.fps)
+        L = args.query_len
+        seg1 = (obs_all[s1:s1 + L], act_all[s1:s1 + L], rew_all[s1:s1 + L])
+        seg2 = (obs_all[s2:s2 + L], act_all[s2:s2 + L], rew_all[s2:s2 + L])
+        print(f"[render] pair {q:03d}: A start={s1} ΣrA={float(seg1[2].sum()):+.1f}  "
+              f"B start={s2} ΣrB={float(seg2[2].sum()):+.1f}")
+        render_segment(*seg1, pair_dir / "seg_A.mp4", args.fps)
+        render_segment(*seg2, pair_dir / "seg_B.mp4", args.fps)
 
     metadata = dict(
         batch_idx=args.batch_idx,
