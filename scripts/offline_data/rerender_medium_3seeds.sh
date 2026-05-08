@@ -4,20 +4,25 @@
 #SBATCH --array=0-2
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
 #
-# Re-roll seed_{0,1,2}/medium-v2 at 1M steps with rendering enabled, so
-# Run B (human labels) has simulator-faithful videos available for the
-# query segments. Each task writes to:
+# Re-roll seed_{0,1,2}/medium-v2 at 200K steps with rendering enabled,
+# so Run B (human labels) has simulator-faithful videos available for
+# the query segments.
 #
+# 200K steps ≈ ~800 episodes/seed — plenty for 100 query pairs, even
+# with the eligibility filter that segments fit within one episode.
+# Earlier 1M-step attempt (job 4895570) timed out at 2h because frame
+# capture + ffmpeg encode is meaningfully slower than a non-render
+# rollout; 200K finishes comfortably in ~30 min.
+#
+# Output per seed:
 #   $SCRATCH/PT/lunarlander/seed_${SEED}/render/medium-v2/
-#       lunarlander-medium-v2.hdf5     # new, lockstep with the mp4s
+#       lunarlander-medium-v2.hdf5     # 200K transitions, lockstep with mp4s
 #       episodes/episode_NNNNN.mp4
 #       episodes/index.pkl
-#
-# Wall: ~30 min/seed (CPU rollout + frame capture + encode), 3 in parallel.
 
 set -euo pipefail
 mkdir -p logs
@@ -44,7 +49,7 @@ fi
 python -m scripts.offline_data.rollout_with_video \
     --actor "$ACTOR" \
     --output_dir "$OUT" \
-    --num_steps 1000000 \
+    --num_steps 200000 \
     --fps 20 \
     --seed "$SEED" \
     --variant medium
