@@ -47,12 +47,7 @@ def smooth(y: np.ndarray, window: int = 10) -> np.ndarray:
 
 
 fig, ax = plt.subplots(figsize=(9, 5), dpi=120)
-ax.set_facecolor("#0f172a")
-fig.patch.set_facecolor("#0f172a")
-for spine in ax.spines.values():
-    spine.set_color("#475569")
-ax.tick_params(colors="#cbd5e1")
-ax.grid(True, color="#334155", linewidth=0.5, alpha=0.6)
+ax.grid(True, color="#cbd5e1", linewidth=0.5, alpha=0.6)
 
 # --- Run A: 3 oracle seeds (mean ± std band + thin per-seed lines) -----------
 oracle_curves = []
@@ -63,38 +58,35 @@ for s in (0, 1, 2):
     oracle_curves.append(y)
     if common_x is None:
         common_x = x
-    ax.plot(x, smooth(y), color="#60a5fa", alpha=0.30, lw=1)
+    ax.plot(x, smooth(y), color="#2563eb", alpha=0.25, lw=1)
 
 oracle_arr = np.stack(oracle_curves)
 mean = smooth(oracle_arr.mean(axis=0))
 std = smooth(oracle_arr.std(axis=0))
-ax.fill_between(common_x, mean - std, mean + std, color="#60a5fa", alpha=0.15)
-ax.plot(common_x, mean, color="#60a5fa", lw=2.5,
+ax.fill_between(common_x, mean - std, mean + std, color="#2563eb", alpha=0.18)
+ax.plot(common_x, mean, color="#2563eb", lw=2.5,
         label="PT-oracle (3 seeds, mean ± std)")
 
 # --- Run B: 1 human seed -----------------------------------------------------
 seed_dir = HUMAN_BASE / "seed_0"
 xh, yh = load(seed_dir, run_tag="human-s0", comment="human100")
-ax.plot(xh, smooth(yh), color="#c084fc", lw=2.5,
+ax.plot(xh, smooth(yh), color="#7c3aed", lw=2.5,
         label="PT-human (seed 0, 100 web labels)")
 
 # --- Annotations -------------------------------------------------------------
-# Dataset baseline: medium-v2's mean episode return (137 from earlier inspection)
-ax.axhline(137.0, color="#facc15", lw=1.2, ls="--", alpha=0.6,
+ax.axhline(137.0, color="#b45309", lw=1.2, ls="--", alpha=0.7,
            label="medium-v2 dataset ep-return mean (+137)")
-# Oracle ceiling: ~+260 (expert) for reference
-ax.axhline(265.0, color="#22c55e", lw=1.0, ls=":", alpha=0.5,
+ax.axhline(265.0, color="#15803d", lw=1.0, ls=":", alpha=0.7,
            label="approx. expert return (+265)")
 
 ax.set_xlim(0, 1_000_000)
-ax.set_xlabel("IQL gradient step", color="#e2e8f0")
-ax.set_ylabel("Online eval return (10 ep)", color="#e2e8f0")
+ax.set_xlabel("IQL gradient step")
+ax.set_ylabel("Online eval return (10 ep)")
 ax.set_title(
     "Preference Transformer on LunarLanderContinuous-v2 (medium dataset, 100 queries)",
-    color="#f8fafc", fontsize=12,
+    fontsize=12,
 )
-leg = ax.legend(loc="lower right", facecolor="#1e293b", edgecolor="#334155",
-                labelcolor="#e2e8f0", fontsize=9)
+ax.legend(loc="lower right", fontsize=9)
 fig.tight_layout()
 fig.savefig(OUT)
 print(f"wrote {OUT}")
