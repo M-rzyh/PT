@@ -4,20 +4,25 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
-#SBATCH --time=02:30:00
+#SBATCH --time=04:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #
-# Run B: PT-with-human-labels on LunarLander-medium-v2, seed 0.
+# Run B: PT-with-human-labels on LunarLander-medium-v2, single seed (seed 0).
 #
-# Mirrors run_pt_pipeline_oracle.sh but with --use_human_label=True. Reads
-# the 100 human labels from human_label/lunarlander-medium-v2-human-s0/
-# (produced by labels_web_to_pt_format.py).
+#   stage 1: train PrefTransformer reward model on the 100 web-collected
+#            human labels (paper defaults: n_epochs=2000, query_len=100,
+#            batch_size=64, transformer.embd_dim=256/n_layer=1/n_head=4).
+#            --use_human_label=True so the rational/scripted labels are
+#            ignored in favour of label_human.
 #
-# Stage 1: PrefTransformer reward training (2000 epochs, 100 human queries)
-# Stage 2: train_offline.py with --use_reward_model=True (1M IQL steps)
+#   stage 2: train_offline.py with --use_reward_model=True
+#            (PT relabels the 200K-transition rendered dataset, IQL runs
+#             1M steps, 10 eval episodes every 5K).
 #
-# Wall: ~15 min stage 1 + ~1.5 min relabel + ~30-50 min IQL ≈ ~50-70 min.
+# Wall (typical): ~15 min stage 1 + ~30s relabel + ~30-40 min IQL ≈ ~50
+# min. 4h SBATCH ceiling = padding for cluster slowness so morning
+# results are essentially guaranteed.
 
 set -euo pipefail
 mkdir -p logs
@@ -39,16 +44,21 @@ CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/human100/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/iql_runs/human100/seed_${SEED}
 
 if [ ! -f "$DATASET" ]; then
-    echo "ERROR: $DATASET missing — run rerender_medium_3seeds.sh first." 1>&2
+    echo "ERROR: $DATASET missing." 1>&2
+    exit 1
+fi
+if [ ! -f /home/marzii/PT/PreferenceTransformer/human_label/${ENV_TAG}/label_human ]; then
+    echo "ERROR: human_label/${ENV_TAG}/label_human missing." 1>&2
     exit 1
 fi
 
 echo "=== seed=$SEED  ENV_TAG=$ENV_TAG ==="
 echo "DATASET   = $DATASET"
 echo "CKPT_DIR  = $CKPT_DIR"
+echo "IQL_LOGS  = $IQL_LOG_DIR"
 echo ""
 
-echo "[stage 1/2] PrefTransformer reward training (2000 epochs, 100 HUMAN queries)"
+echo "[stage 1/2] PrefTransformer reward training (2000 epochs, human labels, 100 queries)"
 python -m JaxPref.new_preference_reward_main \
     --env="$ENV_TAG" \
     --dataset_path="$DATASET" \
@@ -68,7 +78,7 @@ python -m JaxPref.new_preference_reward_main \
     --transformer.n_head=4
 
 echo ""
-echo "[stage 2/2] IQL on PT-relabelled dataset (1M steps)"
+echo "[stage 2/2] IQL on PT-relabelled rendered dataset (1M steps)"
 python train_offline.py \
     --env_name="$ENV_TAG" \
     --dataset_path="$DATASET" \
