@@ -78,6 +78,15 @@ xp, yp = load(seed_dir, env_tag="lunarlander-pebble100-s0", comment="pebble100")
 ax.plot(xp, smooth(yp), color="#dc2626", lw=2.5,
         label="PT-PEBBLE-labels (seed 0, 25 oracle + 75 human)")
 
+# --- PEBBLE's own eval.csv (the source of those labels) -----------------------
+peb_csv = "/scratch/marzii/compare_runs/pebble/lunarlander_web_full/4895573/seed_12345/pebble/eval.csv"
+peb = np.genfromtxt(peb_csv, delimiter=",", names=True)
+ps = peb["step"]; pr = peb["true_episode_reward"]
+order = np.argsort(ps)
+ps, pr = ps[order], pr[order]
+ax.plot(ps, pr, color="#0f766e", lw=2.0, marker="o", markersize=8,
+        label=f"PEBBLE (job 4895573, eval.csv, {len(ps)} points)")
+
 # --- Annotations -------------------------------------------------------------
 ax.axhline(137.0, color="#b45309", lw=1.2, ls="--", alpha=0.7,
            label="medium-v2 dataset ep-return mean (+137)")
