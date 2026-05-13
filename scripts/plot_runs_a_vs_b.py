@@ -176,6 +176,7 @@ ax.axhline(137.0, color="grey", lw=1.0, ls="--", alpha=0.6,
 ax.set_xlabel("Steps")
 ax.set_ylabel("Episode Reward (ep_rew_mean)")
 ax.set_title("PT vs PEBBLE on LunarLanderContinuous-v2 (medium dataset, 100 preference labels)")
+ax.set_ylim(-600, 350)
 ax.legend(loc="lower right", fontsize=9)
 ax.grid(True, alpha=0.3)
 fig.tight_layout()
