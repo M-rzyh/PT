@@ -67,48 +67,43 @@ def last10_str(steps: np.ndarray, vals: np.ndarray) -> str:
     return f"{seg.mean():.1f}±{seg.std():.1f}"
 
 
-# --- gather ---------------------------------------------------------------
-oracle_curves, common_x = [], None
-for s in (0, 1, 2):
-    x, y = load_pt(ORACLE_BASE / f"seed_{s}",
-                    env_tag=f"lunarlander-medium-v2-oracle-s{s}", comment="oracle100")
-    oracle_curves.append(y)
-    if common_x is None: common_x = x
-oracle_arr = np.stack(oracle_curves)
+def gather(base: Path, env_tag_tpl: str, comment: str, n_seeds: int = 5):
+    curves, common_x = [], None
+    for s in range(n_seeds):
+        x, y = load_pt(base / f"seed_{s}", env_tag=env_tag_tpl.format(s=s),
+                       comment=comment)
+        curves.append(y)
+        if common_x is None: common_x = x
+    return common_x, np.stack(curves)
 
-xh, yh = load_pt(HUMAN_BASE / "seed_0",
-                  env_tag="lunarlander-medium-v2-human-s0", comment="human100")
-xp, yp = load_pt(PEBBLE_PT_BASE / "seed_0",
-                  env_tag="lunarlander-pebble100-s0", comment="pebble100")
+
+def plot_band(ax, x, arr, color, label_prefix):
+    mean = smooth(arr.mean(axis=0), window=10)
+    std  = smooth(arr.std(axis=0),  window=10)
+    i = int(arr.shape[1] * 0.9)
+    last10_per_seed = arr[:, i:].mean(axis=1)
+    m, sd = last10_per_seed.mean(), last10_per_seed.std()
+    ax.plot(x, mean, color=color, linewidth=1.8,
+            label=f"{label_prefix} (n={arr.shape[0]} seeds, last10%={m:.1f}±{sd:.1f})")
+    ax.fill_between(x, mean - std, mean + std, color=color, alpha=0.18)
+
+
+# --- gather ---------------------------------------------------------------
+x_o, oracle = gather(ORACLE_BASE, "lunarlander-medium-v2-oracle-s{s}", "oracle100")
+x_h, human  = gather(HUMAN_BASE,  "lunarlander-medium-v2-human-s{s}",  "human100")
+x_p, pebble = gather(PEBBLE_PT_BASE, "lunarlander-pebble100-s{s}",     "pebble100")
 
 ps, pv = load_pebble_curve(PEBBLE_RUN_TB)
-# Heavy smoothing for PEBBLE's per-episode online training rewards.
-pv_sm = smooth(pv, window=200)
+pv_sm = smooth(pv, window=200)  # PEBBLE's per-episode noisy curve
 
 # --- plot ----------------------------------------------------------------
 fig, ax = plt.subplots(figsize=(11, 6))
 COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e"]
+plot_band(ax, x_o, oracle, COLORS[0], "PT-oracle")
+plot_band(ax, x_h, human,  COLORS[3], "PT-human")
+plot_band(ax, x_p, pebble, COLORS[1], "PT-PEBBLE-labels")
 
-# PT-oracle: mean ± std band
-mean = smooth(oracle_arr.mean(axis=0), window=10)
-std  = smooth(oracle_arr.std(axis=0),  window=10)
-last10_m = oracle_arr[:, int(oracle_arr.shape[1]*0.9):].mean()
-last10_s = oracle_arr[:, int(oracle_arr.shape[1]*0.9):].mean(axis=1).std()
-ax.plot(common_x, mean, color=COLORS[0], linewidth=1.8,
-        label=f"PT-oracle (n=3 seeds, last10%={last10_m:.1f}±{last10_s:.1f})")
-ax.fill_between(common_x, mean - std, mean + std, color=COLORS[0], alpha=0.18)
-
-# PT-human (1 seed)
-yh_sm = smooth(yh, window=10)
-ax.plot(xh, yh_sm, color=COLORS[3], linewidth=1.8,
-        label=f"PT-human (n=1 seed, last10%={last10_str(xh, yh)})")
-
-# PT-PEBBLE-labels (1 seed)
-yp_sm = smooth(yp, window=10)
-ax.plot(xp, yp_sm, color=COLORS[1], linewidth=1.8,
-        label=f"PT-PEBBLE-labels (n=1 seed, last10%={last10_str(xp, yp)})")
-
-# PEBBLE itself
+# PEBBLE itself (single seed, dense online-training reward)
 ax.plot(ps, pv_sm, color=COLORS[2], linewidth=1.8,
         label=f"PEBBLE (job 4895573, train/true_ep_rew, last10%={last10_str(ps, pv)})")
 
