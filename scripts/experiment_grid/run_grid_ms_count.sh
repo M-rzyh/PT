@@ -5,10 +5,13 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
-#SBATCH --time=05:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
 #
+# Allocated 2 hours to each of the runs, but it can be done in 30 minutes. 
+# WHAT: Step 3 of 3. The actual work for ONE (count N, seed): PT reward model
+#       -> IQL (1M steps) -> eval_summary.json. Launched by submit_ms_count.sh.
 # Multi-seed count-axis run. Each array task (seed) sees a DIFFERENT random
 # sample of N preference pairs from the dataset (via per-seed data_seed in
 # the label generation step).

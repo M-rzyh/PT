@@ -53,6 +53,13 @@ def parse_args() -> argparse.Namespace:
                    help="Noise percentages to generate (0-100). Default: none.")
     p.add_argument("--n_counts", nargs="+", type=int, default=[],
                    help="Label counts for count axis (e.g. 50 100 250 500 750 1000).")
+    p.add_argument("--noise_mode", choices=["random_replace", "deterministic_flip"],
+                   default="random_replace",
+                   help="How a corrupted label is generated (noise axis only). "
+                        "random_replace (default): uniform draw from {-1,0,1}; "
+                        "deterministic_flip: invert the preference (0<->1). "
+                        "flip outputs use 'flipnoise{P}'/'flipclean' tags so they "
+                        "never collide with random_replace's 'noise{P}'/'clean'.")
     return p.parse_args()
 
 
@@ -86,12 +93,51 @@ def oracle_label(seg_a_start, seg_b_start, qlen, rewards):
 
 
 def apply_noise(clean, p, rng):
+    """random_replace: a corrupted label is replaced by a uniform draw from
+    {-1, 0, 1}. A corruption lands on the same / opposite / tie answer each
+    with prob 1/3, so alignment = 1 - (2/3)p and even p=1.0 leaves ~1/3 of
+    labels accidentally correct (information destruction, not inversion)."""
     classes = np.array([-1, 0, 1], dtype=int)
     noisy = list(clean)
-    flips = rng.random(len(clean)) < p
+    
+    ## P percent chance of flipping each label And then re-labeling uniformly 
+    # flips = rng.random(len(clean)) < p
+    
+    ## Relabeling exactly p percent of the labels uniformly. 
+    n = len(clean)
+    n_corrupt = int(round(p * n))
+    flips = np.zeros(n, dtype=bool)
+    flips[rng.choice(n, size=n_corrupt, replace=False)] = True
+    
     for i, do_flip in enumerate(flips):
         if do_flip:
             noisy[i] = int(rng.choice(classes))
+    return noisy
+
+
+def apply_noise_flip(clean, p, rng):
+    """deterministic_flip: a corrupted label becomes the EXACT opposite
+    preference (0<->1). Ties (-1) have no opposite and are left unchanged.
+    This injects anti-signal rather than destroying it: alignment = 1 - p
+    (over decisive pairs), and at p=1.0 every decisive label is inverted."""
+    noisy = list(clean)
+    
+    ## P percent chance of flipping each label And then re-labeling deterministically
+    # flips = rng.random(len(clean)) < p
+    
+    ## Relabeling exactly p percent of the labels deterministically.
+    n = len(clean)
+    n_corrupt = int(round(p * n))
+    flips = np.zeros(n, dtype=bool)
+    flips[rng.choice(n, size=n_corrupt, replace=False)] = True
+    
+    for i, do_flip in enumerate(flips):
+        if do_flip:
+            if clean[i] == 0:
+                noisy[i] = 1
+            elif clean[i] == 1:
+                noisy[i] = 0
+            # clean[i] == -1 (tie): no opposite, leave unchanged
     return noisy
 
 
@@ -154,6 +200,10 @@ def main() -> None:
         print(f"[s={S}] wrote {env_tag}  (N={N}, clean)")
 
     # --- Noise axis -----------------------------------------------------------
+    if args.noise_mode == "deterministic_flip":
+        noise_word, clean_word, noise_fn = "exflipnoise", "exflipclean", apply_noise_flip
+    else:
+        noise_word, clean_word, noise_fn = "exnoise", "exclean", apply_noise
     for P in args.noise_pcts:
         # Unique noise RNG seed per (training_seed, noise_pct).
         noise_rng_seed = (S + 10) * 100 + P
@@ -161,10 +211,10 @@ def main() -> None:
 
         if P == 0:
             noisy = list(clean)
-            env_tag = f"lunarlander-grid-ms-N{args.num_total}-clean-s{S}"
+            env_tag = f"lunarlander-grid-ms-N{args.num_total}-{clean_word}-s{S}"
         else:
-            noisy = apply_noise(clean, P / 100.0, rng_noise)
-            env_tag = f"lunarlander-grid-ms-N{args.num_total}-noise{P}-s{S}"
+            noisy = noise_fn(clean, P / 100.0, rng_noise)
+            env_tag = f"lunarlander-grid-ms-N{args.num_total}-{noise_word}{P}-s{S}"
 
         alignment = float(sum(int(a == b) for a, b in zip(clean, noisy)) / len(clean))
         out_dir = args.label_root / env_tag
@@ -172,6 +222,7 @@ def main() -> None:
             condition_id=env_tag,
             num_query=args.num_total,
             noise_pct=P,
+            noise_mode=args.noise_mode,
             training_seed=S,
             noise_rng_seed=noise_rng_seed,
             data_seed=args.data_seed,

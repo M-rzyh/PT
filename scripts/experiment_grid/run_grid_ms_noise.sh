@@ -5,10 +5,13 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
-#SBATCH --time=05:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
 #
+# Allocated 2 hours to each of the runs, but it can be done in 30 minutes. 
+# WHAT: Step 3 of 3. The actual work for ONE (noise level, seed): PT reward
+#       model -> IQL (1M steps) -> eval_summary.json. Launched by submit_ms_noise.sh.
 # Multi-seed noise grid run. Each array task (seed) sees a DIFFERENT set of
 # corrupted preference pairs — unlike run_grid_condition.sh where all seeds
 # share the same label file.
@@ -33,22 +36,35 @@ export SDL_VIDEODRIVER=dummy
 cd /home/marzii/PT/PreferenceTransformer
 
 : "${NOISE_PCT:?must export NOISE_PCT=<integer 0-100>}"
+# NOISE_MODE selects the corruption model. Must match the mode the labels were
+# generated with in setup_grid_labels_ms.py:
+#   random_replace   (default): tags 'noise{P}' / 'clean'
+#   deterministic_flip        : tags 'flipnoise{P}' / 'flipclean'
+NOISE_MODE=${NOISE_MODE:-random_replace}
 SEED=${SLURM_ARRAY_TASK_ID:-0}
-NUM_QUERY=1000
+# Label budget. Default 1000 (existing noise grid). Export NUM_QUERY=50 for the
+# low-budget / matched-human-time sweep. Labels must exist for this N.
+NUM_QUERY=${NUM_QUERY:-1000}
+
+if [ "$NOISE_MODE" = "deterministic_flip" ]; then
+    NOISE_WORD="exflipnoise"; CLEAN_WORD="exflipclean"
+else
+    NOISE_WORD="exnoise"; CLEAN_WORD="exclean"
+fi
 
 # Seed-specific label dir (unique noise draw per seed).
 if [ "$NOISE_PCT" -eq 0 ]; then
-    LABEL_TAG="lunarlander-grid-ms-N${NUM_QUERY}-clean-s${SEED}"
+    LABEL_TAG="lunarlander-grid-ms-N${NUM_QUERY}-${CLEAN_WORD}-s${SEED}"
 else
-    LABEL_TAG="lunarlander-grid-ms-N${NUM_QUERY}-noise${NOISE_PCT}-s${SEED}"
+    LABEL_TAG="lunarlander-grid-ms-N${NUM_QUERY}-${NOISE_WORD}${NOISE_PCT}-s${SEED}"
 fi
 
 # Condition ID used for IQL output dir and eval_summary (no seed suffix so
 # all seeds for the same noise level land under the same condition directory).
 if [ "$NOISE_PCT" -eq 0 ]; then
-    COND_ID="lunarlander-grid-ms-N${NUM_QUERY}-clean"
+    COND_ID="lunarlander-grid-ms-N${NUM_QUERY}-${CLEAN_WORD}"
 else
-    COND_ID="lunarlander-grid-ms-N${NUM_QUERY}-noise${NOISE_PCT}"
+    COND_ID="lunarlander-grid-ms-N${NUM_QUERY}-${NOISE_WORD}${NOISE_PCT}"
 fi
 
 DATASET=$SCRATCH/PT/lunarlander/mixture/lunarlander-mixture-v2-s0.hdf5

@@ -17,6 +17,6 @@ export SDL_VIDEODRIVER=dummy
 
 cd /home/marzii/PT/PreferenceTransformer
 
-python scripts/plot_runs_mixture_no_pebblelabels.py
-python scripts/plot_runs_mixture.py
+python scripts/plots/plot_runs_mixture_no_pebblelabels.py
+python scripts/plots/plot_runs_mixture.py
 echo "done"
