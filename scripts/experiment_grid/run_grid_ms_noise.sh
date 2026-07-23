@@ -46,10 +46,13 @@ SEED=${SLURM_ARRAY_TASK_ID:-0}
 # low-budget / matched-human-time sweep. Labels must exist for this N.
 NUM_QUERY=${NUM_QUERY:-1000}
 
+NOISE_SELECTION=${NOISE_SELECTION:-exact}   # exact (exnoise*) or coin (noise*)
 if [ "$NOISE_MODE" = "deterministic_flip" ]; then
-    NOISE_WORD="exflipnoise"; CLEAN_WORD="exflipclean"
+    if [ "$NOISE_SELECTION" = "coin" ]; then NOISE_WORD="flipnoise"; CLEAN_WORD="flipclean"
+    else NOISE_WORD="exflipnoise"; CLEAN_WORD="exflipclean"; fi
 else
-    NOISE_WORD="exnoise"; CLEAN_WORD="exclean"
+    if [ "$NOISE_SELECTION" = "coin" ]; then NOISE_WORD="noise"; CLEAN_WORD="clean"
+    else NOISE_WORD="exnoise"; CLEAN_WORD="exclean"; fi
 fi
 
 # Seed-specific label dir (unique noise draw per seed).

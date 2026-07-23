@@ -55,6 +55,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--query_len", type=int, default=100)
     p.add_argument("--fps", type=int, default=20)
     p.add_argument("--batch_idx", type=int, default=0)
+    # --- Frame-blanking difficulty (Exp 1): blank frames the HUMAN sees --------
+    # Opt-in; default 'none' = unchanged. Blanked frames hide the lander so the
+    # labeler can't see it (harder to give preferences).
+    p.add_argument("--blank_mode", choices=["none", "stochastic", "deterministic"],
+                   default="none", help="Blank displayed frames (human difficulty). Default off.")
+    p.add_argument("--blank_prob", type=float, default=0.5)
+    p.add_argument("--blank_k", type=int, default=2)
+    p.add_argument("--blank_seed", type=int, default=0,
+                   help="Base seed; each segment gets a distinct reproducible mask.")
     return p.parse_args()
 
 
@@ -82,8 +91,13 @@ def _triangle_vertices(x: float, y: float, ang: float, size: float = 0.15) -> np
 
 
 def render_segment(obs: np.ndarray, act: np.ndarray, rew: np.ndarray,
-                   out_path: Path, fps: int) -> None:
-    """obs: (T, 8), act: (T, 2), rew: (T,) — write an mp4 to out_path."""
+                   out_path: Path, fps: int, blank_frames: np.ndarray = None) -> None:
+    """obs: (T, 8), act: (T, 2), rew: (T,) — write an mp4 to out_path.
+
+    blank_frames: optional (T,) bool mask. True frames hide the lander/trail/velocity/
+    state HUD → the human sees a blank 'no-signal' frame (frame-blanking difficulty).
+    None = no blanking (unchanged).
+    """
     T = len(obs)
     xs, ys = obs[:, 0], obs[:, 1]
     vxs, vys = obs[:, 2], obs[:, 3]
@@ -139,6 +153,14 @@ def render_segment(obs: np.ndarray, act: np.ndarray, rew: np.ndarray,
     leg_offset = 0.13  # leg length
 
     def update(t: int):
+        if blank_frames is not None and bool(blank_frames[t]):
+            # blanked frame: hide the lander & per-frame state -> human sees no signal
+            for art in (body, leg_l_art, leg_r_art, trail, vel_arrow):
+                art.set_visible(False)
+            hud.set_text("(frame blanked)")
+            return body, leg_l_art, leg_r_art, trail, vel_arrow, hud
+        for art in (body, leg_l_art, leg_r_art, trail, vel_arrow):
+            art.set_visible(True)
         x, y = float(xs[t]), float(ys[t])
         ang = float(angles[t])
         # Body triangle
@@ -178,6 +200,16 @@ def render_segment(obs: np.ndarray, act: np.ndarray, rew: np.ndarray,
     plt.close(fig)
 
 
+def _seg_blank_mask(args, batch, pair, side, T):
+    """Reproducible (T,) blank mask for one segment; None if blanking is off."""
+    if args.blank_mode == "none":
+        return None
+    if args.blank_mode == "deterministic":
+        return (np.arange(T) % int(args.blank_k)) == 0
+    seed = (args.blank_seed * 100003 + batch * 1009 + pair * 7 + side) % (2 ** 32)
+    return np.random.default_rng(seed).random(T) < float(args.blank_prob)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -206,8 +238,10 @@ def main() -> None:
         seg2 = (obs_all[s2:s2 + L], act_all[s2:s2 + L], rew_all[s2:s2 + L])
         print(f"[render] pair {q:03d}: A start={s1} ΣrA={float(seg1[2].sum()):+.1f}  "
               f"B start={s2} ΣrB={float(seg2[2].sum()):+.1f}")
-        render_segment(*seg1, pair_dir / "seg_A.mp4", args.fps)
-        render_segment(*seg2, pair_dir / "seg_B.mp4", args.fps)
+        bf1 = _seg_blank_mask(args, args.batch_idx, q, 0, L)
+        bf2 = _seg_blank_mask(args, args.batch_idx, q, 1, L)
+        render_segment(*seg1, pair_dir / "seg_A.mp4", args.fps, blank_frames=bf1)
+        render_segment(*seg2, pair_dir / "seg_B.mp4", args.fps, blank_frames=bf2)
 
     metadata = dict(
         batch_idx=args.batch_idx,

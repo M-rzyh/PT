@@ -42,6 +42,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--num_query", type=int, default=10)
     p.add_argument("--query_len", type=int, default=100)
     p.add_argument("--batch_idx", type=int, default=0)
+    p.add_argument("--out_fps", type=int, default=None,
+                   help="Playback fps of the emitted clips. Default None = same as the source "
+                        "(20), i.e. unchanged. Each frame is ONE env step (physics 50 steps/s), "
+                        "so out_fps=20 is 0.40x real time and out_fps=50 is real time. This is a "
+                        "lossless RE-TIME (no frames added or dropped) up to 60 fps; past that a "
+                        "display cannot show every frame. Does NOT affect which frames are cut.")
     return p.parse_args()
 
 
@@ -58,20 +64,28 @@ def find_episode(episodes: list[dict], step: int, length: int) -> dict:
 
 
 def slice_segment(ffmpeg: str, src_mp4: Path, frame_offset: int, length: int,
-                  fps: int, out_mp4: Path) -> None:
+                  src_fps: int, out_mp4: Path, out_fps: int | None = None) -> None:
     """Re-encode a length-`length` segment starting at frame `frame_offset`.
 
     Re-encode (not stream-copy) keeps timing exact and the output seekable.
+
+    `src_fps` is the SOURCE rate and is used only to convert `frame_offset` into a seek
+    time — it must never be replaced by `out_fps`, or we would cut the wrong frames.
+    `out_fps` (None = keep `src_fps`) only changes how fast the same `length` frames are
+    played back.
     """
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
-    start_sec = frame_offset / fps
+    start_sec = frame_offset / src_fps
     cmd = [
         ffmpeg, "-y", "-loglevel", "error",
         "-ss", f"{start_sec:.4f}", "-i", str(src_mp4),
         "-vframes", str(length),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20",
-        str(out_mp4),
     ]
+    if out_fps is not None and out_fps != src_fps:
+        # Re-time: same frames, different playback rate. `setpts` rescales the timestamps
+        # and `-r` stamps the new rate; frame COUNT is unchanged.
+        cmd += ["-vf", f"setpts=PTS*{src_fps}/{out_fps}", "-r", str(out_fps)]
+    cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(out_mp4)]
     subprocess.run(cmd, check=True)
 
 
@@ -91,14 +105,19 @@ def main() -> None:
     # Load episode index.
     ep_index_path = args.rollout_dir / "episodes" / "index.pkl"
     with open(ep_index_path, "rb") as g: episodes = pickle.load(g)
-    fps = int(episodes[0]["n_frames"] / max(1, episodes[0]["end_step"] - episodes[0]["start_step"] + 1) + 0.5) or 20
+    src_fps = int(episodes[0]["n_frames"] / max(1, episodes[0]["end_step"] - episodes[0]["start_step"] + 1) + 0.5) or 20
     # The above is fragile; the rollout HDF5 has fps in its attrs — read that.
     import h5py
     hdf5_glob = list(args.rollout_dir.glob("lunarlander-*.hdf5"))
     if hdf5_glob:
         with h5py.File(hdf5_glob[0], "r") as f:
-            fps = int(f.attrs.get("fps", fps))
-    print(f"[extract] {len(episodes)} episodes, fps={fps}")
+            src_fps = int(f.attrs.get("fps", src_fps))
+    out_fps = args.out_fps if args.out_fps is not None else src_fps
+    if out_fps > 60:
+        print(f"[extract] WARNING: out_fps={out_fps} exceeds 60 — a display cannot show every "
+              f"frame, so the clip is effectively frame-dropped on playback.")
+    print(f"[extract] {len(episodes)} episodes, src_fps={src_fps}, out_fps={out_fps} "
+          f"({out_fps / 50:.2f}x real time)")
 
     batch_dir = args.output_dir / f"batch_{args.batch_idx:03d}"
     batch_dir.mkdir(parents=True, exist_ok=True)
@@ -113,13 +132,14 @@ def main() -> None:
             print(f"[extract] pair {q:03d} seg {tag}: step={start} → "
                   f"episode {ep['episode_idx']:>5d} (frames {frame_offset}…{frame_offset + args.query_len - 1})")
             slice_segment(ffmpeg, Path(ep["mp4_path"]), frame_offset,
-                          args.query_len, fps, out_mp4)
+                          args.query_len, src_fps, out_mp4, out_fps=out_fps)
 
     metadata = dict(
         batch_idx=args.batch_idx,
         n_pairs=args.num_query,
         query_len=args.query_len,
-        fps=fps,
+        fps=out_fps,        # the clips' ACTUAL playback rate (what label_web reports)
+        src_fps=src_fps,    # the rollout rate the frames were cut at
         rollout_dir=str(args.rollout_dir),
         query_dir=str(args.query_dir),
         indices_1=i1.tolist(),

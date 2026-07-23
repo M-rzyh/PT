@@ -348,7 +348,11 @@ def serve_video(pair_idx: int, segment: str):
         return "Not found", 404
     p = ALL_PAIRS[pair_idx]
     path = p["seg_a"] if segment == "a" else p["seg_b"]
-    return send_file(path, mimetype="video/mp4")
+    resp = send_file(path, mimetype="video/mp4")
+    # Don't let the browser replay stale cached clips across labeling sessions.
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 @app.route("/api/status")
@@ -387,6 +391,44 @@ def api_label():
     })
 
 
+def _load_existing_labels() -> None:
+    """Re-populate LABELS from an existing OUTPUT_PATH pickle (opt-in --resume).
+
+    label_web always serves pairs in order (`current = len(LABELS)`), so entry i
+    of a saved pickle corresponds to ALL_PAIRS[i]. We verify that against the
+    stored segment start indices and refuse to resume on any mismatch.
+    """
+    if not OUTPUT_PATH.exists():
+        print(f"[label_web] --resume: {OUTPUT_PATH} does not exist; starting fresh.")
+        return
+    with open(OUTPUT_PATH, "rb") as f:
+        prev = pickle.load(f)
+    labels = prev["labels"]
+    if len(labels) > len(ALL_PAIRS):
+        raise SystemExit(
+            f"[label_web] --resume: pickle has {len(labels)} entries but query_dir "
+            f"only has {len(ALL_PAIRS)} pairs — wrong --query_dir/--output pairing?"
+        )
+    for i, lab in enumerate(labels):
+        pair = ALL_PAIRS[i]
+        if prev["pair_starts_a"][i] != pair["idx_a"] or prev["pair_starts_b"][i] != pair["idx_b"]:
+            raise SystemExit(
+                f"[label_web] --resume: pair {i} start indices disagree with query_dir "
+                f"(pickle {prev['pair_starts_a'][i]},{prev['pair_starts_b'][i]} vs "
+                f"dir {pair['idx_a']},{pair['idx_b']}) — refusing to overwrite."
+            )
+        LABELS.append({
+            "pair_index": i,
+            "batch_idx": pair["batch_idx"],
+            "pair_idx_in_batch": pair["pair_idx"],
+            "label": lab,
+            "time_sec": float(prev["time_sec"][i]),
+        })
+    n_lab = sum(1 for l in LABELS if l["label"] is not None)
+    print(f"[label_web] --resume: restored {len(LABELS)} entries "
+          f"({n_lab} labeled), continuing at pair {len(LABELS)} / {len(ALL_PAIRS)}")
+
+
 def _save_labels() -> None:
     """Write the in-memory LABELS to OUTPUT_PATH after every click."""
     out = {
@@ -411,6 +453,10 @@ def main() -> None:
                         help="Where to save the labels pickle.")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--resume", action="store_true",
+                        help="Continue an interrupted session: load --output and pick up "
+                             "where it stopped. Without this, an existing --output is "
+                             "overwritten from scratch on the first click.")
     args = parser.parse_args()
 
     global ALL_PAIRS, TOP_META, QUERY_DIR, OUTPUT_PATH
@@ -418,6 +464,11 @@ def main() -> None:
     OUTPUT_PATH = args.output
     ALL_PAIRS, TOP_META = load_all_pairs(QUERY_DIR)
     print(f"[label_web] loaded {len(ALL_PAIRS)} pairs from {QUERY_DIR}")
+    if args.resume:
+        _load_existing_labels()
+    elif OUTPUT_PATH.exists():
+        print(f"[label_web] WARNING: {OUTPUT_PATH} already exists and will be OVERWRITTEN "
+              f"on the first click. Pass --resume to continue it instead.")
     print(f"[label_web] meta: {TOP_META}")
     print(f"[label_web] writing labels to {OUTPUT_PATH} (auto-saved after each click)")
     print(f"[label_web] starting on http://{args.host}:{args.port}")

@@ -65,7 +65,7 @@ def select_episodes(episodes_index: list[dict], bounds: list[tuple[int, int]],
 
 
 def load_source(src_dir: Path):
-    """Returns (hdf5_arrays_dict, bounds, episodes_index)."""
+    """Returns (hdf5_arrays_dict, bounds, episodes_index, src_fps)."""
     # The rendered companion has its HDF5 named after the variant.
     hdf5_glob = list(src_dir.glob("lunarlander-*.hdf5"))
     if not hdf5_glob:
@@ -75,13 +75,17 @@ def load_source(src_dir: Path):
         arrs = {k: f[k][:] for k in
                 ("observations", "actions", "rewards", "next_observations",
                  "terminals", "timeouts")}
+        # Carry the rollout's real fps through instead of asserting 20 downstream:
+        # extract_segment_videos.py reads this attr to seek into the source mp4s, so a
+        # silent disagreement with rollout_with_video.py --fps would cut the wrong frames.
+        src_fps = int(f.attrs.get("fps", 20))
     bounds = trajectory_bounds(arrs["terminals"].astype(bool),
                                 arrs["timeouts"].astype(bool))
     # index.pkl tells us how each episode maps to an mp4.
     with open(src_dir / "episodes/index.pkl", "rb") as g:
         ep_idx = pickle.load(g)
     # Sanity: episodes_index length should match bounds length (close enough).
-    return arrs, bounds, ep_idx
+    return arrs, bounds, ep_idx, src_fps
 
 
 def slice_episode(arrs: dict[str, np.ndarray], bound: tuple[int, int]) -> dict[str, np.ndarray]:
@@ -112,10 +116,19 @@ def main() -> None:
 
     # ---- Load all 4 (random, medium, mr, expert) and sample episode lists -----
     loaded: dict[str, tuple[dict, list, list]] = {}
+    src_fpss: dict[str, int] = {}
     for v, d in SRC.items():
-        arrs, bounds, ep_idx = load_source(d)
+        arrs, bounds, ep_idx, src_fps = load_source(d)
         loaded[v] = (arrs, bounds, ep_idx)
-        print(f"[load] {v:14s} N={arrs['rewards'].shape[0]} bounds={len(bounds)} mp4s={len(ep_idx)}")
+        src_fpss[v] = src_fps
+        print(f"[load] {v:14s} N={arrs['rewards'].shape[0]} bounds={len(bounds)} "
+              f"mp4s={len(ep_idx)} fps={src_fps}")
+
+    # The mixture's clips come from these mp4s, so they must all share one frame rate.
+    if len(set(src_fpss.values())) != 1:
+        raise SystemExit(f"[fatal] source rollouts disagree on fps: {src_fpss} — "
+                         f"extract_segment_videos.py would seek to the wrong frames.")
+    mix_fps = next(iter(src_fpss.values()))
 
     chosen_eps: dict[str, list[int]] = {}
     chosen_eps["random"] = select_episodes(loaded["random"][2], loaded["random"][1],
@@ -216,7 +229,7 @@ def main() -> None:
         f.attrs["mix_seed"] = args.mix_seed
         f.attrs["source_seed"] = args.seed
         f.attrs["variant_names"] = "|".join(VARIANT_NAMES)
-        f.attrs["fps"] = 20
+        f.attrs["fps"] = mix_fps   # carried from the source rollouts, not hardcoded
 
     (out_dir / "episodes").mkdir(parents=True, exist_ok=True)
     with open(out_dir / "episodes/index.pkl", "wb") as g:

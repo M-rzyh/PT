@@ -249,6 +249,15 @@ def plot_noise_combined(pt, pt_ms, gail_noise_new, gail_count_new, out_path: Pat
                 capsize=4, linewidth=1.8,
                 label="PT label-flip (30 seeds, N=1000, per-seed flipped pairs)")
 
+    # 100%-noise value lines (labelled) — for cross-N comparison with the N=50/N=5 plot
+    for data, color in [(data_ms, "#1f77b4"), (data_g, "#9467bd")]:
+        p100 = next((d for d in data if d["pct"] == 100), None)
+        if p100:
+            ax.axhline(p100["mean"], color=color, ls="--", lw=1.1, alpha=0.6)
+            ax.annotate(f"{p100['mean']:+.0f}", (ax.get_xlim()[0], p100["mean"]),
+                        xytext=(3, 2), textcoords="offset points", fontsize=9,
+                        fontweight="bold", color=color, va="bottom")
+
     ax.axhline(0, color="gray", linestyle="--", alpha=0.4)
     ax.set_xlabel("Noise (%)")
     ax.set_ylabel("Mean Eval Reward (mean over seeds)")
