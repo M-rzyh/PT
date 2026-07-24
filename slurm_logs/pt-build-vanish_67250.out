@@ -1,0 +1,35 @@
+==============================================================
+[build] level 25%  ->  /scratch/marzii/PT/lunarlander/lander_vanish/pt_human/videos_human_n100_vanish25
+  metadata: n_pairs=100 indices_1[:3]=[82706, 451717, 189733]
+[vanish] episode plates enabled (5617 episodes indexed)
+  ... pair 0/100 (2 plates cached)
+  ... pair 20/100 (42 plates cached)
+  ... pair 40/100 (82 plates cached)
+  ... pair 60/100 (121 plates cached)
+  ... pair 80/100 (160 plates cached)
+[vanish] 100 pairs, block b=5 p=0.25 -> 5135/20000 frames in blanked blocks (25.7%), lander removed on 5135; index.pkl repointed
+[vanish] background reconstructed from episode frames; 0 px needed the column fallback (none — the plate covered everything)
+==============================================================
+[build] level 50%  ->  /scratch/marzii/PT/lunarlander/lander_vanish/pt_human/videos_human_n100_vanish50
+  metadata: n_pairs=100 indices_1[:3]=[82706, 451717, 189733]
+[vanish] episode plates enabled (5617 episodes indexed)
+  ... pair 0/100 (2 plates cached)
+  ... pair 20/100 (42 plates cached)
+  ... pair 40/100 (82 plates cached)
+  ... pair 60/100 (121 plates cached)
+  ... pair 80/100 (160 plates cached)
+[vanish] 100 pairs, block b=5 p=0.5 -> 9950/20000 frames in blanked blocks (49.8%), lander removed on 9950; index.pkl repointed
+[vanish] background reconstructed from episode frames; 0 px needed the column fallback (none — the plate covered everything)
+==============================================================
+[build] level 75%  ->  /scratch/marzii/PT/lunarlander/lander_vanish/pt_human/videos_human_n100_vanish75
+  metadata: n_pairs=100 indices_1[:3]=[82706, 451717, 189733]
+[vanish] episode plates enabled (5617 episodes indexed)
+  ... pair 0/100 (2 plates cached)
+  ... pair 20/100 (42 plates cached)
+  ... pair 40/100 (82 plates cached)
+  ... pair 60/100 (121 plates cached)
+  ... pair 80/100 (160 plates cached)
+[vanish] 100 pairs, block b=5 p=0.75 -> 14845/20000 frames in blanked blocks (74.2%), lander removed on 14845; index.pkl repointed
+[vanish] background reconstructed from episode frames; 0 px needed the column fallback (none — the plate covered everything)
+==============================================================
+[build] done. Verify with: /scratch/marzii/envs/pt/bin/python /home/marzii/PT/PreferenceTransformer/scripts/preference/verify_vanish_sets.py

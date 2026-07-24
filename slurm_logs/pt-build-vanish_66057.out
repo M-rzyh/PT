@@ -1,0 +1,7 @@
+==============================================================
+[build] level 25%  ->  /scratch/marzii/PT/lunarlander/lander_vanish/pt_human/videos_human_n100_vanish25
+  metadata: n_pairs=100 indices_1[:3]=[82706, 451717, 189733]
+[vanish] 100 pairs, block b=5 p=0.25 -> 5135/20000 frames in blanked blocks (25.7%), lander removed on 5022; index.pkl repointed
+==============================================================
+[build] level 50%  ->  /scratch/marzii/PT/lunarlander/lander_vanish/pt_human/videos_human_n100_vanish50
+  metadata: n_pairs=100 indices_1[:3]=[82706, 451717, 189733]
