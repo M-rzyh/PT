@@ -1,5 +1,6 @@
 import os
 import pickle
+import glob
 from collections import defaultdict
 
 import numpy as np
@@ -180,8 +181,33 @@ def main(_):
         env = FLAGS.env
 
     base_path = os.path.join(FLAGS.data_dir, env)
+
+    def _pick_one(pattern):
+        """Find the single file matching `pattern` in base_path.
+
+        Replaces the original `sorted(os.listdir(base_path))` unpacking, which
+        identified the three query files by SORT POSITION rather than by name.
+        That worked only while each folder held exactly three entries. A fourth
+        entry breaks it two different ways:
+          - sorts late  (metadata.pkl, notes.txt) -> ValueError, at least loud;
+          - sorts early (README.md, .DS_Store, or an .nfs* file the filesystem
+            creates on its own when a file is deleted while still open)
+            -> every assignment silently shifts by one and training proceeds
+               on the wrong arrays with no error at all.
+        Matching by name is immune to both, and to any future extra files.
+        """
+        hits = sorted(glob.glob(os.path.join(base_path, pattern)))
+        if len(hits) != 1:
+            raise RuntimeError(
+                "expected exactly 1 file matching %r in %s, found %d: %s"
+                % (pattern, base_path, len(hits), [os.path.basename(h) for h in hits]))
+        return os.path.basename(hits[0])
+
     if os.path.exists(base_path):
-        human_indices_2_file, human_indices_1_file, human_labels_file = sorted(os.listdir(base_path))
+        # human_indices_2_file, human_indices_1_file, human_labels_file = sorted(os.listdir(base_path))
+        human_indices_1_file = _pick_one("indices_num*")
+        human_indices_2_file = _pick_one("indices_2_num*")
+        human_labels_file = _pick_one("label_*")
         with open(os.path.join(base_path, human_indices_1_file), "rb") as fp:   # Unpickling
             human_indices = pickle.load(fp)
         with open(os.path.join(base_path, human_indices_2_file), "rb") as fp:   # Unpickling
@@ -196,7 +222,7 @@ def main(_):
 
         true_eval = True if len(human_labels) > FLAGS.num_query else False
         pref_eval_dataset = r_tf.load_queries_with_indices(
-            gym_env, dataset, int(FLAGS.num_query * 0.1), FLAGS.query_len,
+            gym_env, dataset, max(1, int(FLAGS.num_query * 0.1)), FLAGS.query_len,
             label_type=label_type, saved_indices=[human_indices, human_indices_2], saved_labels=human_labels,
             balance=FLAGS.balance, scripted_teacher=not FLAGS.use_human_label)
     else:
@@ -204,7 +230,10 @@ def main(_):
             gym_env, dataset, FLAGS.num_query, FLAGS.query_len,
             data_dir=base_path, label_type=label_type, balance=FLAGS.balance)
 
-        human_indices_2_file, human_indices_1_file, script_labels_file = sorted(os.listdir(base_path))
+        # human_indices_2_file, human_indices_1_file, script_labels_file = sorted(os.listdir(base_path))
+        human_indices_1_file = _pick_one("indices_num*")
+        human_indices_2_file = _pick_one("indices_2_num*")
+        script_labels_file = _pick_one("label_*")
         with open(os.path.join(base_path, human_indices_1_file), "rb") as fp:   # Unpickling
             human_indices = pickle.load(fp)
         with open(os.path.join(base_path, human_indices_2_file), "rb") as fp:   # Unpickling
@@ -217,7 +246,7 @@ def main(_):
         # that never landed in `load_queries_with_indices`'s signature.
         # Drop them; the kwargs the function actually accepts are below.
         pref_eval_dataset = r_tf.load_queries_with_indices(
-            gym_env, dataset, int(FLAGS.num_query * 0.1), FLAGS.query_len,
+            gym_env, dataset, max(1, int(FLAGS.num_query * 0.1)), FLAGS.query_len,
             label_type=label_type, saved_indices=[human_indices, human_indices_2], saved_labels=human_labels,
             balance=FLAGS.balance, scripted_teacher=True)
 
