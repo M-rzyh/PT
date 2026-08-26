@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=pt-build-vanish
 #SBATCH --account=aip-mtaylor3
-#SBATCH --output=/home/marzii/PT/PreferenceTransformer/slurm_logs/%x_%j.out
-#SBATCH --error=/home/marzii/PT/PreferenceTransformer/slurm_logs/%x_%j.err
+#SBATCH --output=/scratch/marzii/PT/logs/vanish/%x_%j.out
+#SBATCH --error=/scratch/marzii/PT/logs/vanish/%x_%j.err
 #SBATCH --time=06:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
@@ -32,7 +32,7 @@ QLEN=100       # frames per clip
 BLOCK=5        # b=5 -> 0.25 s at 20 fps
 SEED=0
 
-mkdir -p "$REPO/slurm_logs" "$DEST_ROOT"
+mkdir -p /scratch/marzii/PT/logs/vanish "$DEST_ROOT"
 
 for PCT in 25 50 75; do
   DEST="$DEST_ROOT/videos_human_n100_vanish${PCT}"

@@ -3,8 +3,8 @@
 #SBATCH --account=aip-mtaylor3
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --output=/home/marzii/PT/PreferenceTransformer/logs/%x_%j.out
-#SBATCH --error=/home/marzii/PT/PreferenceTransformer/logs/%x_%j.err
+#SBATCH --output=/scratch/marzii/PT/logs/delay/%x_%j.out
+#SBATCH --error=/scratch/marzii/PT/logs/delay/%x_%j.err
 #
 # NOTE: no #SBATCH --time here on purpose. Walltime is passed at submit so light jobs
 # schedule fast and heavy ones get enough runway:

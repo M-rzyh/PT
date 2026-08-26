@@ -30,7 +30,7 @@ cd /home/marzii/PT/PreferenceTransformer
 SEED=${SEED:-${SLURM_ARRAY_TASK_ID:-1}}
 ENV_TAG=lunarlander-medium-v2-human-s${SEED}
 DATASET=$SCRATCH/PT/lunarlander/seed_0/render/medium-v2/lunarlander-medium-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/human100/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/human100/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/iql_runs/human100/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }

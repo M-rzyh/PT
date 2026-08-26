@@ -15,7 +15,7 @@
 # auto-samples 100 random pairs and labels them by ground-truth reward sum
 # (--use_human_label=False).
 #
-# Output: ./reward_model/lunarlander-medium-v2-s0-oracle100/PrefTransformer/oracle100/s42/{best_model,model}.pkl
+# Output: ./reward_model/lunarlander/lunarlander-medium-v2-s0-oracle100/PrefTransformer/oracle100/s42/{best_model,model}.pkl
 
 set -euo pipefail
 mkdir -p logs/misc

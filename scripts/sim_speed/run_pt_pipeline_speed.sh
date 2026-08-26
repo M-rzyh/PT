@@ -34,7 +34,7 @@ NQ=100
 TAG=humanspeed${FPS}
 ENV_TAG=lunarlander-mixture-v2-${TAG}-s${SEED}
 DATASET=$SCRATCH/PT/lunarlander/seed_0/render/mixture-v2/lunarlander-mixture-v2.hdf5   # CLEAN
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/${TAG}/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/${TAG}/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/sim_speed/${TAG}_mixture/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }

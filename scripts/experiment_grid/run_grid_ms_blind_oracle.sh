@@ -37,7 +37,7 @@ else
 fi
 
 DATASET=$SCRATCH/PT/lunarlander/seed_0/render/mixture-v2/lunarlander-mixture-v2.hdf5   # RENDERED 8-D mixture (same data the human labels; normal task)
-CKPT_DIR=./reward_model/${LABEL_TAG}/PrefTransformer/frame_blank/s${SEED}
+CKPT_DIR=./reward_model/${LABEL_TAG%%-*}/${LABEL_TAG}/PrefTransformer/frame_blank/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/frame_blanking/${COND_ID}/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }

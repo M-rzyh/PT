@@ -25,7 +25,7 @@ cd /home/marzii/PT/PreferenceTransformer
 SEED=${SEED:-${SLURM_ARRAY_TASK_ID:-0}}
 ENV_TAG=lunarlander-mixture-v2-humanblock5p50-s${SEED}
 DATASET=$SCRATCH/PT/lunarlander/seed_0/render/mixture-v2/lunarlander-mixture-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/humanblock5p50/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/humanblock5p50/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/frame_blanking/humanblock5p50_mixture/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }

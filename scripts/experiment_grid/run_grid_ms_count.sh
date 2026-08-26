@@ -44,7 +44,7 @@ LABEL_TAG="${LABEL_PREFIX}-N${N_COUNT}-s${SEED}"
 COND_ID="${LABEL_PREFIX}-N${N_COUNT}"
 
 DATASET=${DATASET:-$SCRATCH/PT/lunarlander/mixture/lunarlander-mixture-v2-s0.hdf5}
-CKPT_DIR=./reward_model/${LABEL_TAG}/PrefTransformer/grid_ms_count/s${SEED}
+CKPT_DIR=./reward_model/${LABEL_TAG%%-*}/${LABEL_TAG}/PrefTransformer/grid_ms_count/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/grid_mixture_ms/${COND_ID}/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }

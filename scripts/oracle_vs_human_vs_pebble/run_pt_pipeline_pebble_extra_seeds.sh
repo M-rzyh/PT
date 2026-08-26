@@ -32,7 +32,7 @@ SEED=${SEED:-${SLURM_ARRAY_TASK_ID:-1}}
 ENV_TAG=lunarlander-pebble100-s${SEED}
 SYNTHETIC=$SCRATCH/PT/lunarlander/pebble_labels/lunarlander-pebble100-s0.hdf5
 IQL_DATASET=$SCRATCH/PT/lunarlander/seed_0/lunarlander-medium-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/pebble100/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/pebble100/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/iql_runs/pebble100/seed_${SEED}
 
 for f in "$SYNTHETIC" "$IQL_DATASET"; do

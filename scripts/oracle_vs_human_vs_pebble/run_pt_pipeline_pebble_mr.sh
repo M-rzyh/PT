@@ -32,7 +32,7 @@ SYNTHETIC=$SCRATCH/PT/lunarlander/pebble_labels/lunarlander-pebble100-s0.hdf5
 # Use the new rendered medium-replay HDF5 (shared across A-mr / B-mr / C-mr)
 # for IQL relabel + training, so all three runs sit on the same data.
 IQL_DATASET=$SCRATCH/PT/lunarlander/seed_0/render/medium-replay-v2/lunarlander-medium-replay-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/pebble100/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/pebble100/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/iql_runs/pebble100_mr/seed_${SEED}
 
 for f in "$SYNTHETIC" "$IQL_DATASET"; do

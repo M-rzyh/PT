@@ -31,7 +31,7 @@ ENV_TAG=lunarlander-medium-replay-v2-oracle-s${SEED}
 # Single rendered medium-replay HDF5, shared across all 5 PT training seeds
 # (mirrors how Run B on medium used seed_0/render/medium-v2 across its 5 seeds).
 DATASET=$SCRATCH/PT/lunarlander/seed_0/render/medium-replay-v2/lunarlander-medium-replay-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/oracle100/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/oracle100/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/iql_runs/oracle100_mr/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }

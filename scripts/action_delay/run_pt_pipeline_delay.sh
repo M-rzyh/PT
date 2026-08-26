@@ -38,7 +38,7 @@ TAG=humandelay${K}
 ENV_TAG=lunarlander-mixture-v2-${TAG}-s${SEED}
 # The DELAYED mixture for this level — NOT the clean one.
 DATASET=$SCRATCH/PT/lunarlander/action_delay/mixture-delay${K}/lunarlander-mixture-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/${TAG}/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/${TAG}/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/action_delay/${TAG}_mixture/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: delayed mixture $DATASET missing (build it first)." 1>&2; exit 1; }

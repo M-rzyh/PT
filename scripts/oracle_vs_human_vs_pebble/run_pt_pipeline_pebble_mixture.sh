@@ -23,7 +23,7 @@ ENV_TAG=lunarlander-mixture-v2-pebble-s${SEED}
 # Stage 2 (IQL) runs on the rendered mixture (same dataset as A-mixture/B-mixture).
 SYNTHETIC=$SCRATCH/PT/lunarlander/pebble_labels/lunarlander-pebble100-s0.hdf5
 IQL_DATASET=$SCRATCH/PT/lunarlander/seed_0/render/mixture-v2/lunarlander-mixture-v2.hdf5
-CKPT_DIR=./reward_model/${ENV_TAG}/PrefTransformer/pebble100/s${SEED}
+CKPT_DIR=./reward_model/${ENV_TAG%%-*}/${ENV_TAG}/PrefTransformer/pebble100/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/iql_runs/pebble100_mixture/seed_${SEED}
 
 for f in "$SYNTHETIC" "$IQL_DATASET"; do

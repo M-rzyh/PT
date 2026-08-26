@@ -3,8 +3,8 @@
 #SBATCH --account=aip-mtaylor3
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --output=/home/marzii/PT/PreferenceTransformer/logs/%x_%j.out
-#SBATCH --error=/home/marzii/PT/PreferenceTransformer/logs/%x_%j.err
+#SBATCH --output=/scratch/marzii/PT/logs/speed/%x_%j.out
+#SBATCH --error=/scratch/marzii/PT/logs/speed/%x_%j.err
 #
 # Build the PT SPEED-axis preference video sets: the SAME 100 clean pairs, re-timed to a
 # faster/slower playback rate. Speed is pure playback (frames are 1-per-step), so this is a
