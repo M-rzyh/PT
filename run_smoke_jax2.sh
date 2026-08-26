@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=00:15:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/smoke/%x_%j.out
+#SBATCH --error=logs/smoke/%x_%j.err
 
 # Smoke test #2: verifies the full PT minimal stack on a GPU node.
 # Imports flax/optax/distrax/transformers/gym, runs a small Flax MLP on the
@@ -14,7 +14,7 @@
 # JaxPref module. If this passes, we are ready to start §6 (LunarLander
 # dataset generation).
 
-mkdir -p logs
+mkdir -p logs/smoke
 
 module --force purge
 module load StdEnv/2023

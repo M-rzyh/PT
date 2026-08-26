@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/blindoracle/%x_%A_%a.out
+#SBATCH --error=logs/blindoracle/%x_%A_%a.err
 #
 # WHAT: PT blind-oracle training (frame-blanking, Exp 1). Reward model + IQL on the
 #       TRUE 8-D mixture using BLIND-ORACLE labels (degraded by frame-blanking). The
@@ -15,7 +15,7 @@
 #       in frame_blanking/. Eval = last10_eval_reward (matches the noise plots).
 #   sbatch --array=0-4 --export=ALL,BLANK_PCT=<pct> scripts/experiment_grid/run_grid_ms_blind_oracle.sh
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/blindoracle
 module --force purge
 module load StdEnv/2023
 eval "$(/scratch/marzii/miniforge3/bin/conda shell.bash hook)"

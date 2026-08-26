@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/pipeline/%x_%j.out
+#SBATCH --error=logs/pipeline/%x_%j.err
 #
 # Run C: PT-with-PEBBLE-labels on LunarLander.
 #
@@ -25,7 +25,7 @@
 # A/B so the three runs sit in the same eval space for direct comparison.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/pipeline
 
 module --force purge
 module load StdEnv/2023

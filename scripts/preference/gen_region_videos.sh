@@ -4,8 +4,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=01:30:00
-#SBATCH --output=logs/region_vid_%j.out
-#SBATCH --error=logs/region_vid_%j.err
+#SBATCH --output=logs/render/region_vid_%j.out
+#SBATCH --error=logs/render/region_vid_%j.err
 #
 # Region masking (Sweep 1) — PT human video sets. Copies the CLEAN N=350 segment
 # set and paints one fixed black rectangle over every frame of each segment (area =
@@ -13,7 +13,7 @@
 # training seeds). Levels 25/50/75%; 0% reuses videos_human_n350_clean / humanblock0.
 # Isolated in region_mask/ (sibling of frame_blanking/); nothing existing is modified.
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/render
 module --force purge; module load StdEnv/2023
 eval "$(/scratch/marzii/miniforge3/bin/conda shell.bash hook)"
 conda activate /scratch/marzii/envs/pt

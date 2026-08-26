@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/render/%x_%j.out
+#SBATCH --error=logs/render/%x_%j.err
 #
 # Re-train sb3 SAC seed=0 with rendering enabled, up to the medium-replay
 # checkpoint (~70 K steps). Produces a new HDF5 + per-episode mp4s in
@@ -20,7 +20,7 @@
 #   episodes/index.pkl
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/render
 
 module --force purge
 module load StdEnv/2023

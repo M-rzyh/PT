@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/pipeline/%x_%A_%a.out
+#SBATCH --error=logs/pipeline/%x_%A_%a.err
 #
 # Run C extra seeds (1..4). Each task reuses the same 100 PEBBLE labels
 # and the synthetic reward-training HDF5 from seed_0; only the PT/IQL
@@ -16,7 +16,7 @@
 # RNG varies" protocol).
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/pipeline
 
 module --force purge
 module load StdEnv/2023

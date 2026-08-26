@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=01:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/render/%x_%A_%a.out
+#SBATCH --error=logs/render/%x_%A_%a.err
 #
 # Re-roll seed_{0,1,2}/medium-v2 at 200K steps with rendering enabled,
 # so Run B (human labels) has simulator-faithful videos available for
@@ -25,7 +25,7 @@
 #       episodes/index.pkl
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/render
 
 module --force purge
 module load StdEnv/2023

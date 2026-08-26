@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/grid_ms/%x_%A_%a.out
+#SBATCH --error=logs/grid_ms/%x_%A_%a.err
 #
 # Allocated 2 hours to each of the runs, but it can be done in 30 minutes. 
 # WHAT: Step 3 of 3. The actual work for ONE (noise level, seed): PT reward
@@ -23,7 +23,7 @@
 # NOISE_PCT: integer 0-100 (0 = clean / no corruption).
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/grid_ms
 
 module --force purge
 module load StdEnv/2023
@@ -71,6 +71,10 @@ else
 fi
 
 DATASET=$SCRATCH/PT/lunarlander/mixture/lunarlander-mixture-v2-s0.hdf5
+EVAL_INTERVAL=${EVAL_INTERVAL:-5000}
+COND_SUFFIX=${COND_SUFFIX:-}
+SKIP_REWARD=${SKIP_REWARD:-0}
+COND_ID="${COND_ID}${COND_SUFFIX}"
 CKPT_DIR=./reward_model/${LABEL_TAG}/PrefTransformer/grid_ms/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/grid_mixture_ms/${COND_ID}/seed_${SEED}
 
@@ -81,6 +85,10 @@ IQL_LOG_DIR=$SCRATCH/PT/lunarlander/grid_mixture_ms/${COND_ID}/seed_${SEED}
 echo "=== NOISE_PCT=$NOISE_PCT  SEED=$SEED  LABEL_TAG=$LABEL_TAG ==="
 # this here "--use_human_label=True" means loading the labels we have done before, not that the reward model is trained with human labels (it is trained with the noisy labels, but the --use_human_label flag just controls loading the label file for generating the training pairs, not whether those labels are noisy or clean).
 echo "[stage 1/3] PT reward training"
+
+if [[ "$SKIP_REWARD" == "1" ]]; then
+  echo "  SKIP_REWARD=1 -> reusing existing reward model at $CKPT_DIR"
+else
 python -m JaxPref.new_preference_reward_main \
     --env="$LABEL_TAG" \
     --dataset_path="$DATASET" \
@@ -98,6 +106,7 @@ python -m JaxPref.new_preference_reward_main \
     --transformer.embd_dim=256 \
     --transformer.n_layer=1 \
     --transformer.n_head=4
+fi
 
 echo ""
 echo "[stage 2/3] IQL on PT-relabelled mixture dataset (1M steps)"
@@ -109,7 +118,7 @@ python train_offline.py \
     --model_type=PrefTransformer \
     --ckpt_dir="$CKPT_DIR" \
     --max_steps=1000000 \
-    --eval_interval=5000 \
+    --eval_interval="$EVAL_INTERVAL" \
     --eval_episodes=10 \
     --log_interval=1000 \
     --tqdm=False \

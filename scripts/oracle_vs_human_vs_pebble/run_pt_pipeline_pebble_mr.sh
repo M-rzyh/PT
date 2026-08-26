@@ -6,15 +6,15 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/pipeline/%x_%A_%a.out
+#SBATCH --error=logs/pipeline/%x_%A_%a.err
 #
 # Run C on medium-replay. PT reward training uses the synthetic HDF5 from
 # PEBBLE's pref_buffer (unchanged from Run C on medium). IQL stage swaps
 # to seed_0/lunarlander-medium-replay-v2.hdf5.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/pipeline
 
 module --force purge
 module load StdEnv/2023

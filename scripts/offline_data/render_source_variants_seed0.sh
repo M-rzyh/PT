@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/render/%x_%j.out
+#SBATCH --error=logs/render/%x_%j.err
 #
 # Render one of {random, medium, expert} from seed_0 with simulator frames,
 # in preparation for the rendered mixture HDF5 used by mixture-Run-B
@@ -15,7 +15,7 @@
 # Output: $SCRATCH/PT/lunarlander/seed_0/render/<variant>-v2/
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/render
 
 module --force purge
 module load StdEnv/2023

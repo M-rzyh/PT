@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=04:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/misc/%x_%A_%a.out
+#SBATCH --error=logs/misc/%x_%A_%a.err
 #
 # Phase A orchestrator: produces the 5 LunarLander HDF5 datasets PER SEED.
 # Submitted as a 5-seed job array (SLURM_ARRAY_TASK_ID -> SEED in {0..4}).
@@ -32,7 +32,7 @@
 
 set -euo pipefail
 
-mkdir -p logs
+mkdir -p logs/misc
 
 module --force purge
 module load StdEnv/2023

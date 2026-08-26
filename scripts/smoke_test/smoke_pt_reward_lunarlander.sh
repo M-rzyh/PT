@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/smoke/%x_%j.out
+#SBATCH --error=logs/smoke/%x_%j.err
 #
 # Phase D smoke: run JaxPref/new_preference_reward_main.py on the 10
 # human-labelled pairs for seed_0/medium-v2. Uses PrefTransformer with a
@@ -14,7 +14,7 @@
 # upstream code path all wire together before scaling.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/smoke
 
 module --force purge
 module load StdEnv/2023

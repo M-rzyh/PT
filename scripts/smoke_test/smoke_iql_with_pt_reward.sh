@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:15:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/smoke/%x_%j.out
+#SBATCH --error=logs/smoke/%x_%j.err
 #
 # Phase D smoke: train_offline.py with --use_reward_model=True. Loads the
 # already-trained oracle100 PT reward model, relabels every transition in
@@ -14,7 +14,7 @@
 # path before launching the 3-seed Run A array.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/smoke
 
 module --force purge
 module load StdEnv/2023

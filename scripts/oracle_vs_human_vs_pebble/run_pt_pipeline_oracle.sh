@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=02:30:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/pipeline/%x_%A_%a.out
+#SBATCH --error=logs/pipeline/%x_%A_%a.err
 #
 # Run A: PT-with-oracle on LunarLander-medium-v2.
 # 3-seed array (SLURM_ARRAY_TASK_ID -> seed in {0,1,2}). Each task does:
@@ -24,7 +24,7 @@
 # Wall: ~15 min stage 1 + ~1.5 min relabel + ~40-50 min IQL ≈ ~60-70 min per seed.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/pipeline
 
 module --force purge
 module load StdEnv/2023

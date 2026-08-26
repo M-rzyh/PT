@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/humanblock/%x_%A_%a.out
+#SBATCH --error=logs/humanblock/%x_%A_%a.err
 #
 # PT BLIND-HUMAN 50% at BLOCK b=5 (0.25 s @ 20 fps) -- the b=5 redo of the
 # frame-blanking human arm. Reward model + IQL on the rendered mixture using the
@@ -15,7 +15,7 @@
 # across the 10 array tasks (the human labelled once); the array = 10 TRAINING
 # seeds -> the mean+-std band. Outputs isolated in frame_blanking/humanblock5p50_mixture.
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/humanblock
 module --force purge; module load StdEnv/2023
 eval "$(/scratch/marzii/miniforge3/bin/conda shell.bash hook)"
 conda activate /scratch/marzii/envs/pt

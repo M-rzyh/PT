@@ -4,8 +4,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=00:40:00
-#SBATCH --output=logs/gen_ms_count_%j.out
-#SBATCH --error=logs/gen_ms_count_%j.err
+#SBATCH --output=logs/label_gen/gen_ms_count_%j.out
+#SBATCH --error=logs/label_gen/gen_ms_count_%j.err
 #
 # WHAT: Step 1 of 3 (gen -> submit -> run). Makes the COUNT labels: samples N
 #       pairs per seed and oracle-labels them (clean, no noise).
@@ -18,7 +18,7 @@
 #
 # Mirrors submit_ms_count.sh. Calls setup_grid_labels_ms.py once per seed.
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/label_gen
 module --force purge
 module load StdEnv/2023
 eval "$(/scratch/marzii/miniforge3/bin/conda shell.bash hook)"

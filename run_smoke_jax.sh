@@ -5,15 +5,15 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=00:15:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/smoke/%x_%j.out
+#SBATCH --error=logs/smoke/%x_%j.err
 
 # Smoke test #1: verify JAX detects the GPU and runs a basic computation.
 # If this passes, we know the L40S (sm_89) is compatible with our JAX install.
 # A more comprehensive smoke test (Flax MLP, LunarLander rollout, full JaxPref
 # imports) lives in run_smoke_jax2.sh.
 
-mkdir -p logs
+mkdir -p logs/smoke
 
 module --force purge
 module load StdEnv/2023

@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/vanish/%x_%A_%a.out
+#SBATCH --error=logs/vanish/%x_%A_%a.err
 #
 # PT HUMAN arm of the LANDER-VANISHING study. Reward model + IQL on the rendered mixture,
 # using the human's preferences over videos in which the lander itself was removed (terrain
@@ -28,7 +28,7 @@
 # existing clean 350 (see scripts/preference/make_vanish0_labels.py), which is why the
 # 25/50/75 video sets were built from exactly those same pairs.
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/vanish
 module --force purge; module load StdEnv/2023
 eval "$(/scratch/marzii/miniforge3/bin/conda shell.bash hook)"
 conda activate /scratch/marzii/envs/pt

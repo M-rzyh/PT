@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/pipeline/%x_%A_%a.out
+#SBATCH --error=logs/pipeline/%x_%A_%a.err
 #
 # Run B extra seeds (1..4). Each task reuses the same 100 human labels
 # (collected for seed_0) and the same rendered 200K HDF5; only the PT/IQL
@@ -15,7 +15,7 @@
 # convention of "labels fixed across seeds, algorithm RNG varies".
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/pipeline
 
 module --force purge
 module load StdEnv/2023

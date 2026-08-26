@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/pipeline/%x_%A_%a.out
+#SBATCH --error=logs/pipeline/%x_%A_%a.err
 #
 # Run B-mr: PT-with-human-labels on medium-replay. 5-seed SLURM array.
 # All 5 seeds share the same 100 human labels (collected on seed_0's
@@ -15,7 +15,7 @@
 # PT-reward and IQL stages. Only --seed / --data_seed varies.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/pipeline
 
 module --force purge
 module load StdEnv/2023

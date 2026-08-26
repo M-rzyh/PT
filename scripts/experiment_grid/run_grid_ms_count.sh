@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/%x_%A_%a.out
-#SBATCH --error=logs/%x_%A_%a.err
+#SBATCH --output=logs/grid_ms/%x_%A_%a.out
+#SBATCH --error=logs/grid_ms/%x_%A_%a.err
 #
 # Allocated 2 hours to each of the runs, but it can be done in 30 minutes. 
 # WHAT: Step 3 of 3. The actual work for ONE (count N, seed): PT reward model
@@ -21,7 +21,7 @@
 #       scripts/experiment_grid/run_grid_ms_count.sh
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/grid_ms
 
 module --force purge
 module load StdEnv/2023
@@ -36,10 +36,14 @@ cd /home/marzii/PT/PreferenceTransformer
 : "${N_COUNT:?must export N_COUNT=<integer>}"
 SEED=${SLURM_ARRAY_TASK_ID:-0}
 
-LABEL_TAG="lunarlander-grid-ms-count-N${N_COUNT}-s${SEED}"
-COND_ID="lunarlander-grid-ms-count-N${N_COUNT}"
+# LABEL_PREFIX + DATASET are overridable (defaults = the original oracle count, so existing runs
+# are unchanged). For the HUMAN count axis: LABEL_PREFIX=lunarlander-human-count and
+# DATASET=<seed_0/render/mixture-v2/...> (the hdf5 the human labels were sampled against).
+LABEL_PREFIX=${LABEL_PREFIX:-lunarlander-grid-ms-count}
+LABEL_TAG="${LABEL_PREFIX}-N${N_COUNT}-s${SEED}"
+COND_ID="${LABEL_PREFIX}-N${N_COUNT}"
 
-DATASET=$SCRATCH/PT/lunarlander/mixture/lunarlander-mixture-v2-s0.hdf5
+DATASET=${DATASET:-$SCRATCH/PT/lunarlander/mixture/lunarlander-mixture-v2-s0.hdf5}
 CKPT_DIR=./reward_model/${LABEL_TAG}/PrefTransformer/grid_ms_count/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/grid_mixture_ms/${COND_ID}/seed_${SEED}
 

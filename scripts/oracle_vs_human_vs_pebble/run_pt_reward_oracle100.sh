@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/misc/%x_%j.out
+#SBATCH --error=logs/misc/%x_%j.err
 #
 # Phase D first real run: PrefTransformer reward training, oracle labels,
 # 100 query pairs, 200 epochs (sanity scope).
@@ -18,7 +18,7 @@
 # Output: ./reward_model/lunarlander-medium-v2-s0-oracle100/PrefTransformer/oracle100/s42/{best_model,model}.pkl
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/misc
 
 module --force purge
 module load StdEnv/2023

@@ -5,15 +5,15 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:15:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=logs/smoke/%x_%j.out
+#SBATCH --error=logs/smoke/%x_%j.err
 #
 # Phase B smoke: produces a 10K-step random LunarLander HDF5 in $TMPDIR, then
 # runs `train_offline.py --env_name=lunarlander-random-v2` for 200 IQL steps
 # to verify the loader, dispatch, and IQL forward path all wire together.
 
 set -euo pipefail
-mkdir -p logs
+mkdir -p logs/smoke
 
 module --force purge
 module load StdEnv/2023
