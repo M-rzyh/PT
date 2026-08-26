@@ -33,6 +33,23 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mix_seed", type=int, default=0)
     p.add_argument("--per_variant", type=int, default=232_500,
                    help="Target transitions per non-mr variant.")
+    # --- optional overrides so the SAME builder can assemble a delayed mixture (action-delay
+    # study) without a second script. Defaults reproduce the original clean 5-source build. ---
+    p.add_argument("--no-medium-replay", dest="no_medium_replay", action="store_true",
+                   help="Drop the medium-replay slice entirely → a 4-source mixture "
+                        "(random+medium+medium-expert+expert). Used by the action-delay study, "
+                        "where medium-replay (a training buffer) has no delayed analogue. To "
+                        "keep ~1M total, pass --per_variant 250000.")
+    p.add_argument("--random-dir", type=Path, default=None,
+                   help="Override the random source dir (default render_root/random-v2-mixprep).")
+    p.add_argument("--medium-dir", type=Path, default=None,
+                   help="Override the medium source dir (e.g. a delayed render).")
+    p.add_argument("--expert-dir", type=Path, default=None,
+                   help="Override the expert source dir (e.g. a delayed render).")
+    p.add_argument("--medium-replay-dir", type=Path, default=None,
+                   help="Override the medium-replay source dir.")
+    p.add_argument("--out-dir", type=Path, default=None,
+                   help="Override the output mixture dir (default render_root/mixture-v2).")
     return p.parse_args()
 
 
@@ -97,16 +114,20 @@ def main() -> None:
     args = parse_args()
     SCRATCH = Path(os.environ["SCRATCH"])
     render_root = SCRATCH / f"PT/lunarlander/seed_{args.seed}/render"
-    out_dir = render_root / "mixture-v2"
+    out_dir = args.out_dir if args.out_dir is not None else render_root / "mixture-v2"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Source companions (rendered variants).
+    # Source companions (rendered variants). Each is overridable so a delayed build can point
+    # medium/expert at delayed renders while reusing the (delay-invariant) random render.
     SRC = {
-        "random":        render_root / "random-v2-mixprep",
-        "medium":        render_root / "medium-v2-mixprep",
-        "medium-replay": render_root / "medium-replay-v2",
-        "expert":        render_root / "expert-v2-mixprep",
+        "random":        args.random_dir or render_root / "random-v2-mixprep",
+        "medium":        args.medium_dir or render_root / "medium-v2-mixprep",
+        "medium-replay": args.medium_replay_dir or render_root / "medium-replay-v2",
+        "expert":        args.expert_dir or render_root / "expert-v2-mixprep",
     }
+    if args.no_medium_replay:
+        del SRC["medium-replay"]
+        print("[mix] --no-medium-replay: building a 4-source mixture (no medium-replay)")
     for v, d in SRC.items():
         if not d.exists():
             raise SystemExit(f"missing rendered companion: {d}")
@@ -154,17 +175,19 @@ def main() -> None:
         medium_pick, loaded["medium"][1], args.per_variant)
     chosen_eps["expert"], me_exp_half = split_at_target(
         expert_pick, loaded["expert"][1], args.per_variant)
-    # medium-replay: take ALL episodes (~70K transitions).
-    mr_n = len(loaded["medium-replay"][1])
-    chosen_eps["medium-replay"] = list(range(mr_n))
+    if not args.no_medium_replay:
+        # medium-replay: take ALL episodes (~70K transitions).
+        mr_n = len(loaded["medium-replay"][1])
+        chosen_eps["medium-replay"] = list(range(mr_n))
 
-    # ---- Assemble in order: random → medium → medium-replay → me → expert -----
+    # ---- Assemble in order: random → medium → [medium-replay →] me → expert -----
     mix_obs, mix_act, mix_rew, mix_nxt, mix_term, mix_to = [], [], [], [], [], []
     mix_sources = []
     out_index: list[dict] = []
     cur_pos = 0
     out_episode_idx = 0
-    VARIANT_NAMES = ["random", "medium", "medium-replay", "medium-expert", "expert"]
+    VARIANT_NAMES = (["random", "medium", "medium-expert", "expert"] if args.no_medium_replay
+                     else ["random", "medium", "medium-replay", "medium-expert", "expert"])
 
     def add_episodes(variant_idx: int, src_variant_for_data: str,
                      picks: list[int]):
@@ -195,13 +218,16 @@ def main() -> None:
             cur_pos += n
             out_episode_idx += 1
 
-    add_episodes(0, "random",        chosen_eps["random"])
-    add_episodes(1, "medium",        chosen_eps["medium"])
-    add_episodes(2, "medium-replay", chosen_eps["medium-replay"])
-    # medium-expert (variant_idx=3): half from medium, half from expert
-    add_episodes(3, "medium",        me_med_half)
-    add_episodes(3, "expert",        me_exp_half)
-    add_episodes(4, "expert",        chosen_eps["expert"])
+    # variant_idx must match the position in VARIANT_NAMES for the `sources` tags to be correct.
+    idx = {name: i for i, name in enumerate(VARIANT_NAMES)}
+    add_episodes(idx["random"], "random", chosen_eps["random"])
+    add_episodes(idx["medium"], "medium", chosen_eps["medium"])
+    if not args.no_medium_replay:
+        add_episodes(idx["medium-replay"], "medium-replay", chosen_eps["medium-replay"])
+    # medium-expert: half from medium, half from expert
+    add_episodes(idx["medium-expert"], "medium", me_med_half)
+    add_episodes(idx["medium-expert"], "expert", me_exp_half)
+    add_episodes(idx["expert"], "expert", chosen_eps["expert"])
 
     # ---- Concat + write HDF5 ----------------------------------------------
     obs = np.concatenate(mix_obs).astype(np.float32)
@@ -213,7 +239,7 @@ def main() -> None:
     src  = np.concatenate(mix_sources)
     N = obs.shape[0]
     print(f"\n[mix] total = {N} transitions, {len(out_index)} episodes")
-    counts = {VARIANT_NAMES[i]: int((src == i).sum()) for i in range(5)}
+    counts = {VARIANT_NAMES[i]: int((src == i).sum()) for i in range(len(VARIANT_NAMES))}
     print(f"[mix] counts per variant: {counts}")
 
     hdf5_out = out_dir / "lunarlander-mixture-v2.hdf5"

@@ -50,6 +50,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--env_id", default="LunarLanderContinuous-v3")
     p.add_argument("--variant", default="medium",
                    help="Variant name used in the output HDF5 filename.")
+    p.add_argument("--delay-k", dest="delay_k", type=int, default=0,
+                   help="Action-delay difficulty: apply each action k STEPS late (FIFO primed "
+                        "with a zero-vector no-op). 0 (default) = no delay, identical to the "
+                        "original rollout. The EXECUTED (delayed) action is what gets stored, "
+                        "so the HDF5 stays a consistent (s, a, s') dataset.")
     return p.parse_args()
 
 
@@ -71,6 +76,21 @@ def main() -> None:
     else:
         from stable_baselines3 import SAC
         actor = SAC.load(args.actor, device="cpu")
+
+    # --- action-delay difficulty (default off). Reuses the SAME corruptor the GAIL arm and
+    # the PT example-clip script use, so a given k means the same thing everywhere. Continuous
+    # no-op = zero vector; the queue is primed with it so the first k steps coast (no thrust)
+    # before any real action propagates through. ---
+    apply_ctrl = reset_ctrl = None
+    if args.delay_k > 0:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "preference"))
+        from control_wrappers import make_control_corruptor
+        apply_ctrl, reset_ctrl = make_control_corruptor(
+            sticky_p=0.0, sticky_seed=args.seed, delay_k=args.delay_k,
+            noop_fn=lambda: np.zeros(act_dim, dtype=np.float32))
+        print(f"[rollout] action delay ON: k={args.delay_k} "
+              f"({args.delay_k * 20} ms game time)")
 
     N = args.num_steps
     obs_buf  = np.zeros((N, obs_dim), dtype=np.float32)
@@ -120,6 +140,9 @@ def main() -> None:
             a = env.action_space.sample()
         else:
             a, _ = actor.predict(obs, deterministic=args.deterministic)
+        # Delay the INTENDED action; the env runs the delayed one, and that executed action is
+        # what we store (keeps the dataset a consistent (s, executed_a, s')).
+        a = apply_ctrl(a) if apply_ctrl is not None else a
         nxt, r, terminated, truncated, _ = env.step(a)
 
         obs_buf[t] = obs
@@ -134,6 +157,8 @@ def main() -> None:
             ep_returns.append(ep_return); ep_return = 0.0
             flush_episode(end_step_inclusive=t)
             obs, _ = env.reset()
+            if reset_ctrl is not None:
+                reset_ctrl()          # re-prime the delay queue for the new episode
             cur_frames.append(env.render())
             ep_start_step = t + 1
         else:
@@ -169,6 +194,7 @@ def main() -> None:
         f.attrs["seed"] = int(args.seed)
         f.attrs["fps"] = int(args.fps)
         f.attrs["with_video"] = True
+        f.attrs["delay_k"] = int(args.delay_k)
 
     with open(ep_dir / "index.pkl", "wb") as g:
         pickle.dump(episodes, g)

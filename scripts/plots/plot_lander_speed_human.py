@@ -31,23 +31,27 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pyarrow.ipc
 
-PT_BASE = "/scratch/marzii/PT/lunarlander/lander_vanish"
+PT_BASE = "/scratch/marzii/PT/lunarlander/sim_speed"
 GAIL_BASE = "/scratch/marzii/imitation_runs/gail/lunarlander"
-DEMO_ROOT = "/scratch/marzii/imitation_runs/lander_vanish/demos/human"
+DEMO_ROOT = "/scratch/marzii/imitation_runs/sim_speed/demos/human"
 EXP = "/home/marzii/IRL3/experiments"
 FIG = "/home/marzii/PT/PreferenceTransformer/figures"
 PT_C = "#1f77b4"          # blue   — PT
 GA_FLAG_C = "#d62728"     # red    — GAIL flagged (curated 15)
 GA_FIRST15_C = "#ff7f0e"  # orange — GAIL first-15 (uncurated, count-matched)
 GA_ALL_C = "#ff9896"      # pink   — GAIL all-saved (uncurated, N varies)
-LEVELS = [0, 25, 50, 75]
+LEVELS = [10, 20, 50]   # fps
 N_PREF = 100
 
-PT_CONDS = {p: f"humanvanish{p}_mixture" for p in LEVELS}
+PT_CONDS = {p: f"humanspeed{p}_mixture" for p in LEVELS}
 # The flagged arm always feeds 15; the all-saved arm feeds whatever the session held.
+def _demo_dir(fps, sub):
+    if fps == 20:
+        return f"/scratch/marzii/imitation_runs/lander_vanish/demos/human/vanish_p0/{sub}"
+    return f"{DEMO_ROOT}/speed_fps{fps}/{sub}"
 DEMO_DIRS = {
-    "flagged": {p: f"{DEMO_ROOT}/vanish_p{p}/session_1_flagged" for p in LEVELS},
-    "all":     {p: f"{DEMO_ROOT}/vanish_p{p}/session_1" for p in LEVELS},
+    "flagged": {p: _demo_dir(p, "session_1_flagged") for p in LEVELS},
+    "all":     {p: _demo_dir(p, "session_1") for p in LEVELS},
 }
 
 
@@ -87,14 +91,14 @@ def _ep_return_mean(jobid):
 def gail_series(arm):
     """One GAIL curve for the given arm ('flagged' or 'all'), read from the index CSV(s)."""
     rows = []
-    for f in sorted(glob.glob(f"{EXP}/gail_lander_vanish_human_*.csv")):
+    for f in sorted(glob.glob(f"{EXP}/gail_lander_speed_human_*.csv")):
         rows += list(csv.DictReader(open(f)))
     # A re-run supersedes the original: keep the highest job id per (level, seed, arm).
     best = {}
     for r in rows:
         if r.get("arm", "flagged") != arm:
             continue
-        key = (int(r["vanish_pct"]), int(r["seed"]))
+        key = (int(r["speed_fps"]), int(r["seed"]))
         jid = int(r["slurm_job_id"])
         if key not in best or jid > best[key]:
             best[key] = jid
@@ -176,18 +180,18 @@ def main():
               f"GAIL — all saved (N varies [{cnt}], {seed_txt(ga_a_n)})", ls="--")
 
     ax.axhline(0, color="gray", ls=":", alpha=0.4)
-    ax.set_xlabel("Lander hidden (%)   —   block length b=5 (0.25 s @ 20 fps), terrain visible")
+    ax.set_xlabel("Playback speed (fps)   —   10=0.2x, 20=0.4x, 50=1.0x real time")
     ax.set_ylabel("Mean eval reward")
     ax.set_xticks(LEVELS)
-    ax.set_xlim(-6, 81)
+    ax.set_xlim(6, 54)
     ax.grid(True, alpha=0.3)
     ax.legend(loc="lower left", fontsize=9)
     have = sorted(set(pt) | set(ga_f) | set(ga_15) | set(ga_a))
     missing = [p for p in LEVELS if p not in have]
     sub = f"levels shown: {have}" + (f"; not yet trained: {missing}" if missing else "")
-    ax.set_title("Lander vanishing (human supervision) — PT vs GAIL\n" + sub, fontsize=11)
+    ax.set_title("Simulation speed (human supervision) — PT vs GAIL\n" + sub, fontsize=11)
     fig.tight_layout()
-    out = f"{FIG}/lander_vanish_human_pt_vs_gail.png"
+    out = f"{FIG}/lander_speed_human_pt_vs_gail.png"
     fig.savefig(out, dpi=150)
     print("\nSaved:", out)
 
