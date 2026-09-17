@@ -34,6 +34,8 @@ flags.DEFINE_integer('max_steps', int(1e6), 'Number of training steps.')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_boolean('use_reward_model', False, 'Use reward model for relabeling reward.')
 flags.DEFINE_string('model_type', 'MLP', 'type of reward model.')
+flags.DEFINE_boolean('save_policy', True,
+                     'Save the final IQL networks to <save_dir>/policy/ at the end of training.')
 flags.DEFINE_string('ckpt_dir',
                     './logs/pref_reward',
                     'ckpt path for reward model.')
@@ -210,6 +212,13 @@ def main(_):
             np.savetxt(os.path.join(save_dir, 'progress.txt'),
                        eval_returns,
                        fmt=['%d', '%.1f'])
+    if FLAGS.save_policy:
+        policy_dir = os.path.join(FLAGS.save_dir, 'policy')
+        agent.actor.save(os.path.join(policy_dir, 'actor.flax'))
+        agent.critic.save(os.path.join(policy_dir, 'critic.flax'))
+        agent.value.save(os.path.join(policy_dir, 'value.flax'))
+        agent.target_critic.save(os.path.join(policy_dir, 'target_critic.flax'))
+        print(f"saved policy to {policy_dir}")
 
 
 if __name__ == '__main__':

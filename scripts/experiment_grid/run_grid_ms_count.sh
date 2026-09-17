@@ -44,6 +44,11 @@ LABEL_PREFIX=${LABEL_PREFIX:-lunarlander-grid-ms-count}
 # paths used today, so nothing existing changes. When set, BOTH the IQL output dir and
 # the reward-model dir move under a tagged path, so a re-run can never overwrite the
 # results of a previous run of the same condition.
+
+# True = train on the labels stored in the folder (human runs).
+# False = keep the SAME stored pairs but relabel them with the scripted teacher (sum of true reward).
+USE_HUMAN_LABEL=${USE_HUMAN_LABEL:-True}
+
 RUN_TAG=${RUN_TAG:-}
 LABEL_TAG="${LABEL_PREFIX}-N${N_COUNT}-s${SEED}"
 COND_ID="${LABEL_PREFIX}-N${N_COUNT}${RUN_TAG:+-$RUN_TAG}"
@@ -72,7 +77,7 @@ python -m JaxPref.new_preference_reward_main \
     --env="$LABEL_TAG" \
     --dataset_path="$DATASET" \
     --model_type=PrefTransformer \
-    --use_human_label=True \
+    --use_human_label="$USE_HUMAN_LABEL" \
     --data_dir="$DATA_DIR" \
     --num_query="$N_COUNT" \
     --query_len=100 \
@@ -104,6 +109,7 @@ python train_offline.py \
     --tqdm=False \
     --save_dir="$IQL_LOG_DIR" \
     --seed="$SEED" \
+    --save_policy=True \
     --comment=grid_ms_count
 
 echo ""
