@@ -40,16 +40,30 @@ SEED=${SLURM_ARRAY_TASK_ID:-0}
 # are unchanged). For the HUMAN count axis: LABEL_PREFIX=lunarlander-human-count and
 # DATASET=<seed_0/render/mixture-v2/...> (the hdf5 the human labels were sampled against).
 LABEL_PREFIX=${LABEL_PREFIX:-lunarlander-grid-ms-count}
+# Optional tag that isolates a re-run from an earlier one. Empty (default) = the exact
+# paths used today, so nothing existing changes. When set, BOTH the IQL output dir and
+# the reward-model dir move under a tagged path, so a re-run can never overwrite the
+# results of a previous run of the same condition.
+RUN_TAG=${RUN_TAG:-}
 LABEL_TAG="${LABEL_PREFIX}-N${N_COUNT}-s${SEED}"
-COND_ID="${LABEL_PREFIX}-N${N_COUNT}"
+COND_ID="${LABEL_PREFIX}-N${N_COUNT}${RUN_TAG:+-$RUN_TAG}"
 
+# Label tree was reorganised into human/ | synthetic/ | benchmark/, so data_dir must now point
+# at a subtree. Default = synthetic (the oracle count axis); human runs pass ./human_label/human.
+# Matches run_grid_ms_noise.sh, which already got this fix.
+DATA_DIR=${DATA_DIR:-./human_label/synthetic}
 DATASET=${DATASET:-$SCRATCH/PT/lunarlander/mixture/lunarlander-mixture-v2-s0.hdf5}
-CKPT_DIR=./reward_model/${LABEL_TAG%%-*}/${LABEL_TAG}/PrefTransformer/grid_ms_count/s${SEED}
+# Stage 1 saves to <logging.output_dir>/<env>/<model_type>/<comment>/s<seed>
+# (JaxPref/new_preference_reward_main.py:105-113), so output_dir MUST be pinned to the same
+# prefix CKPT_DIR uses -- otherwise stage 1 writes a flat ./reward_model/<env>/... and stage 2
+# cannot find model.pkl. Pinned explicitly below rather than trusting the flag default.
+RM_ROOT=./reward_model/${LABEL_TAG%%-*}${RUN_TAG:+/$RUN_TAG}
+CKPT_DIR=$RM_ROOT/${LABEL_TAG}/PrefTransformer/grid_ms_count/s${SEED}
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/grid_mixture_ms/${COND_ID}/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }
-[[ -f "human_label/${LABEL_TAG}/label_human" ]] || {
-    echo "ERROR: human_label/${LABEL_TAG}/label_human missing." 1>&2; exit 1; }
+[[ -f "${DATA_DIR}/${LABEL_TAG}/label_human" ]] || {
+    echo "ERROR: ${DATA_DIR}/${LABEL_TAG}/label_human missing." 1>&2; exit 1; }
 
 echo "=== N_COUNT=$N_COUNT  SEED=$SEED  LABEL_TAG=$LABEL_TAG ==="
 
@@ -59,6 +73,7 @@ python -m JaxPref.new_preference_reward_main \
     --dataset_path="$DATASET" \
     --model_type=PrefTransformer \
     --use_human_label=True \
+    --data_dir="$DATA_DIR" \
     --num_query="$N_COUNT" \
     --query_len=100 \
     --n_epochs=2000 \
@@ -68,6 +83,7 @@ python -m JaxPref.new_preference_reward_main \
     --data_seed=42 \
     --comment=grid_ms_count \
     --logging.online=False \
+    --logging.output_dir="$RM_ROOT" \
     --transformer.embd_dim=256 \
     --transformer.n_layer=1 \
     --transformer.n_head=4
@@ -92,7 +108,7 @@ python train_offline.py \
 
 echo ""
 echo "[stage 3/3] writing eval_summary.json"
-LABEL_TAG="$LABEL_TAG" COND_ID="$COND_ID" SEED="$SEED" \
+LABEL_TAG="$LABEL_TAG" COND_ID="$COND_ID" SEED="$SEED" DATA_DIR="$DATA_DIR" \
 N_COUNT="$N_COUNT" IQL_LOG_DIR="$IQL_LOG_DIR" \
 python - <<'PY'
 import json, os
@@ -105,7 +121,7 @@ seed        = int(os.environ["SEED"])
 n_count     = int(os.environ["N_COUNT"])
 iql_log_dir = Path(os.environ["IQL_LOG_DIR"])
 
-meta_path = Path("human_label/_grid_metadata") / f"{label_tag}.label_alignment.json"
+meta_path = Path(os.environ["DATA_DIR"]) / "_grid_metadata" / f"{label_tag}.label_alignment.json"
 
 prog_files = sorted(iql_log_dir.glob("**/progress.txt"))
 if not prog_files:
