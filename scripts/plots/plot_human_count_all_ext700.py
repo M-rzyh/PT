@@ -71,10 +71,10 @@ def draw(ax, d, sec, color, marker, lbl):
 
 def main():
     pt = pt_curve([10, 100, 250, 750, 1000])
-    g9 = gail_curve(f"{EXP}/gail_session3_ext700_ksweep_2026-08-13.csv")
-    g2 = gail_curve(f"{EXP}/gail_session3_ext700_RA_ksweep_2026-08-13.csv")
-    a9 = gail_curve(f"{EXP}/airl_session3_ext700_ksweep_2026-08-13.csv")
-    bc = bc_curve(f"{EXP}/bc_warmstart_ext700_2026-08-13.csv")
+    g9 = gail_curve(f"{EXP}/GAIL/gail_session3_ext700_ksweep_2026-08-13.csv")
+    g2 = gail_curve(f"{EXP}/GAIL/gail_session3_ext700_RA_ksweep_2026-08-13.csv")
+    a9 = gail_curve(f"{EXP}/AIRL/airl_session3_ext700_ksweep_2026-08-13.csv")
+    bc = bc_curve(f"{EXP}/BC/bc_warmstart_ext700_2026-08-13.csv")
 
     fig, ax = plt.subplots(figsize=(12, 6.5))
     draw(ax, g9, DEMO_SEC, G9_C, "s", "GAIL — 9-feature ranking")

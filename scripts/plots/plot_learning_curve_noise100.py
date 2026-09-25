@@ -16,10 +16,11 @@ import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 PT_DIR = "/scratch/marzii/PT/lunarlander/grid_mixture_ms/lunarlander-grid-ms-N100-noise100"
-GAIL_IDX = "/home/marzii/IRL3/experiments/gail_grid_noise_N15_2026-07-23.csv"
+GAIL_IDX = "/home/marzii/IRL3/experiments/GAIL/gail_grid_noise_N15_2026-07-23.csv"
 GAIL_BASE = "/scratch/marzii/imitation_runs/gail/lunarlander"
 FIG = "/home/marzii/PT/PreferenceTransformer/figures"
-PT_C, GA_C = "#1f77b4", "#9467bd"
+PT_C, GA_C, CLEAN_C = "#1f77b4", "#9467bd", "#2ca02c"
+GRID = "/scratch/marzii/PT/lunarlander/grid_mixture_ms"
 
 
 def random_floor(env_id, n_eps=100, cap=1000, seed=0):
@@ -38,6 +39,21 @@ def random_floor(env_id, n_eps=100, cap=1000, seed=0):
         rets.append(R)
     env.close()
     return float(np.mean(rets))
+
+
+def pt_cond(cond):
+    """Any PT condition dir -> per-seed (steps, reward). Picks the progress.txt with the MOST
+    rows in each seed, because a re-run writes a NEW timestamped file beside the truncated one."""
+    xs, ys = [], []
+    for d in sorted(glob.glob(f"{GRID}/{cond}/seed_*")):
+        files = glob.glob(f"{d}/**/progress.txt", recursive=True)
+        if not files:
+            continue
+        a = np.loadtxt(max(files, key=lambda f: sum(1 for _ in open(f))))
+        if a.ndim == 1:
+            a = a.reshape(1, -1)
+        xs.append(a[:, 0]); ys.append(a[:, 1])
+    return xs, ys
 
 
 def pt_curves():
@@ -94,11 +110,34 @@ def main():
     print(f"random floors -> continuous {PT_RAND:+.1f} | discrete {GA_RAND:+.1f}")
 
     fig, ax = plt.subplots(figsize=(10, 5.8))
-    for g, m, s, c, lbl in [(gg, gm, gs, GA_C, "GAIL @ 100% noise (N=15 demos)"),
-                            (pg, pm, ps, PT_C, "PT @ 100% noise (N=100 preferences)")]:
-        ms, ss = smooth(m), smooth(s)
-        ax.fill_between(g, ms - ss, ms + ss, color=c, alpha=0.13, lw=0, zorder=1)
-        ax.plot(g, ms, color=c, lw=2.3, label=lbl, zorder=4)
+    # ---- GAIL @ 100% noise ----
+    gms, gss = smooth(gm), smooth(gs)
+    ax.fill_between(gg, gms - gss, gms + gss, color=GA_C, alpha=0.13, lw=0, zorder=1)
+    ax.plot(gg, gms, color=GA_C, lw=2.3, label=f"GAIL @ 100% noise (N=15 demos)", zorder=4)
+
+    # ---- PT @ 100% noise: both evaluation intervals ----
+    for cond, ls, lw, lbl in [("lunarlander-grid-ms-N100-noise100",        ":", 1.6, "PT 100% noise, eval/5000"),
+                              ("lunarlander-grid-ms-N100-noise100-ev1000", "-", 2.3, "PT 100% noise, eval/1000")]:
+        nx, ny = pt_cond(cond)
+        if not nx:
+            continue
+        ng, nm, ns, nn = band(nx, ny)
+        nms, nss = smooth(nm), smooth(ns)
+        if ls == "-":
+            ax.fill_between(ng, nms - nss, nms + nss, color=PT_C, alpha=0.13, lw=0, zorder=1)
+        ax.plot(ng, nms, ls, color=PT_C, lw=lw, label=f"{lbl} ({nn} seeds)", zorder=4)
+
+    # ---- PT with CLEAN labels (0% noise) -- the upper reference ----
+    for cond, ls, lw, lbl in [("lunarlander-grid-ms-N100-clean",        ":", 1.6, "PT clean, eval/5000"),
+                              ("lunarlander-grid-ms-N100-clean-ev1000", "-", 2.3, "PT clean, eval/1000")]:
+        cx, cy = pt_cond(cond)
+        if not cx:
+            continue
+        cg, cm, cs, cn = band(cx, cy)
+        cms, css = smooth(cm), smooth(cs)
+        if ls == "-":
+            ax.fill_between(cg, cms - css, cms + css, color=CLEAN_C, alpha=0.12, lw=0, zorder=1)
+        ax.plot(cg, cms, ls, color=CLEAN_C, lw=lw, label=f"{lbl} (0% noise, {cn} seeds)", zorder=4)
 
     ax.axhline(0, color="gray", ls=":", alpha=0.4)
     ax.set_xlim(0, 1e6)
@@ -113,8 +152,8 @@ def main():
     ax.set_xlabel("Steps")
     ax.set_ylabel("Ground truth reward")
     ax.grid(True, alpha=0.3)
-    ax.legend(loc="upper left", fontsize=9)
-    ax.set_title("Learning curves at 100% noise — PT vs GAIL (30 seeds)", fontsize=12.5)
+    ax.legend(loc="lower right", fontsize=8.5)
+    ax.set_title("Learning curves — PT vs GAIL at 100% noise, with clean PT as reference (30 seeds)", fontsize=12.5)
     fig.subplots_adjust(right=0.78)
     out = f"{FIG}/learning_curve_noise100_pt_vs_gail.png"
     fig.savefig(out, dpi=150); print("Saved:", out)

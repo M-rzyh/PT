@@ -47,6 +47,10 @@ flags.DEFINE_bool('use_diff', False, 'boolean whether use difference in sequence
 flags.DEFINE_string('label_mode', 'last', 'mode for relabeling reward with tranformer.')
 flags.DEFINE_string('dataset_path', '',
                     'Path to a custom HDF5 dataset (used when env_name starts with "lunarlander").')
+flags.DEFINE_float('true_reward_shift', 0.0,
+                   'Constant added to rewards in the TRUE-reward path (use_reward_model=False), '
+                   'after normalization. 0.0 = standard oracle IQL (default, unchanged behaviour); '
+                   '0.5 reproduces the shift the learned-reward path applies.')
 
 config_flags.DEFINE_config_file(
     'config',
@@ -151,6 +155,11 @@ def make_env_and_dataset(env_name: str,
             # but I found no difference between (x - 0.5) * 4 and x - 1.0
         elif is_locomotion:
             normalize(dataset, FLAGS.env_name, max_episode_steps=env.env.env._max_episode_steps)
+            # Opt-in only: the learned-reward path above adds +0.5, the upstream
+            # true-reward path does not. Default 0.0 keeps standard oracle IQL.
+            if FLAGS.true_reward_shift:
+                dataset.rewards += FLAGS.true_reward_shift
+                print(f"[reward] true-reward path: added shift {FLAGS.true_reward_shift}")
 
     return env, dataset
 

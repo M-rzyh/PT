@@ -79,8 +79,8 @@ CKPT_DIR=./reward_model/${LABEL_TAG%%-*}/${LABEL_TAG}/PrefTransformer/grid_ms/s$
 IQL_LOG_DIR=$SCRATCH/PT/lunarlander/grid_mixture_ms/${COND_ID}/seed_${SEED}
 
 [[ -f "$DATASET" ]] || { echo "ERROR: $DATASET missing." 1>&2; exit 1; }
-[[ -f "human_label/${LABEL_TAG}/label_human" ]] || {
-    echo "ERROR: human_label/${LABEL_TAG}/label_human missing." 1>&2; exit 1; }
+[[ -f "human_label/synthetic/${LABEL_TAG}/label_human" ]] || {
+    echo "ERROR: human_label/synthetic/${LABEL_TAG}/label_human missing." 1>&2; exit 1; }
 
 echo "=== NOISE_PCT=$NOISE_PCT  SEED=$SEED  LABEL_TAG=$LABEL_TAG ==="
 # this here "--use_human_label=True" means loading the labels we have done before, not that the reward model is trained with human labels (it is trained with the noisy labels, but the --use_human_label flag just controls loading the label file for generating the training pairs, not whether those labels are noisy or clean).
@@ -91,6 +91,7 @@ if [[ "$SKIP_REWARD" == "1" ]]; then
 else
 python -m JaxPref.new_preference_reward_main \
     --env="$LABEL_TAG" \
+    --data_dir=./human_label/synthetic \
     --dataset_path="$DATASET" \
     --model_type=PrefTransformer \
     --use_human_label=True \
@@ -142,7 +143,7 @@ num_query  = int(os.environ["NUM_QUERY"])
 noise_pct  = int(os.environ["NOISE_PCT"])
 iql_log_dir = Path(os.environ["IQL_LOG_DIR"])
 
-meta_path = Path("human_label/_grid_metadata") / f"{label_tag}.label_alignment.json"
+meta_path = Path("human_label/synthetic/_grid_metadata") / f"{label_tag}.label_alignment.json"
 
 prog_files = sorted(iql_log_dir.glob("**/progress.txt"))
 if not prog_files:
